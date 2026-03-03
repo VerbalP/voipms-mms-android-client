@@ -123,7 +123,7 @@ dependencies {
     // Google and Firebase libraries
     "primaryImplementation"(libs.google.gms.playServicesBase)
     "primaryImplementation"(platform(libs.google.firebase.bom))
-    "primaryImplementation"(libs.google.firebase.messaging.ktx)
+    "primaryImplementation"(libs.google.firebase.messaging)
 
     // fdroid-remove-end
 
