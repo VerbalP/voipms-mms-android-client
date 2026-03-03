@@ -138,7 +138,7 @@ class NewConversationActivity : AppCompatActivity(), View.OnClickListener {
 
             // Hide search icon
             val searchMagIcon = searchView.findViewById<ImageView>(
-                R.id.search_mag_icon
+                androidx.constraintlayout.widget.R.id.search_mag_icon
             )
             searchMagIcon.layoutParams = LinearLayout.LayoutParams(0, 0)
 

@@ -1,10 +1,10 @@
+import com.android.build.api.dsl.ApplicationExtension
 import org.gradle.internal.extensions.stdlib.capitalized
 
 plugins {
     id("com.google.devtools.ksp")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.android.application")
-    id("kotlin-android")
     id("net.kourlas.oss-licenses-plugin")
 
     // fdroid-remove-start
@@ -12,7 +12,7 @@ plugins {
     // fdroid-remove-end
 }
 
-android {
+configure<ApplicationExtension> {
     compileSdk = 35
     defaultConfig {
         applicationId = "net.kourlas.voipms_sms"
@@ -76,23 +76,20 @@ android {
         sourceCompatibility(JavaVersion.VERSION_17)
         targetCompatibility(JavaVersion.VERSION_17)
     }
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
-    }
     buildFeatures {
         compose = true
         buildConfig = true
     }
     sourceSets.getByName("main") {
-        java.srcDir("src/main/kotlin")
+        kotlin.directories += "src/main/kotlin"
     }
     // fdroid-remove-start
     sourceSets.getByName("primary") {
-        java.srcDir("src/primary/kotlin")
+        kotlin.directories += "src/primary/kotlin"
     }
     // fdroid-remove-end
     sourceSets.getByName("fdroid") {
-        java.srcDir("src/fdroid/kotlin")
+        kotlin.directories += "src/fdroid/kotlin"
     }
     lint {
         abortOnError = false
@@ -164,23 +161,25 @@ tasks.getByName("copyToAssets") {
     dependsOn("cleanAssets")
 }
 
-android.applicationVariants.configureEach {
-    val variantName = this.name
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        val variantName = variant.name
 
-    val generatePackageLicenses =
-        tasks.register<Exec>("generatePackageLicenses${variantName.capitalized()}") {
-            commandLine(
-                "python",
-                "../licenses/packageLicenseParser.py",
-                variantName
-            )
-    }.get()
+        val generatePackageLicenses =
+            tasks.register<Exec>("generatePackageLicenses${variantName.capitalized()}") {
+                commandLine(
+                    "python",
+                    "../licenses/packageLicenseParser.py",
+                    variantName
+                )
+            }.get()
 
-    tasks.matching { it.name == "${name}OssLicensesTask" }
-        .configureEach { generatePackageLicenses.dependsOn(this) }
+        tasks.matching { it.name == "${name}OssLicensesTask" }
+            .configureEach { generatePackageLicenses.dependsOn(this) }
 
-    tasks.matching { it.name == "generate${name.capitalized()}Assets" }
-        .configureEach { this.dependsOn(generatePackageLicenses) }
+        tasks.matching { it.name == "generate${name.capitalized()}Assets" }
+            .configureEach { this.dependsOn(generatePackageLicenses) }
 
-    generatePackageLicenses.dependsOn("cleanAssets")
+        generatePackageLicenses.dependsOn("cleanAssets")
+    }
 }
