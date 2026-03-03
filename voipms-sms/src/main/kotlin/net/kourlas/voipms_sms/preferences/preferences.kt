@@ -594,7 +594,6 @@ fun removePreference(context: Context, key: String) {
 
 private const val LEGACY_KEYSTORE_TYPE = "AndroidKeyStore"
 private const val LEGACY_SECURE_SHARED_PREFERENCES_NAME = "SecurePreferences"
-private const val LEGACY_KEY_CIPHER_JELLYBEAN_PROVIDER = "AndroidOpenSSL"
 private const val LEGACY_KEY_CIPHER_MARSHMALLOW_PROVIDER =
     "AndroidKeyStoreBCWorkaround"
 private const val LEGACY_KEY_TRANSFORMATION_ALGORITHM = "RSA/ECB/PKCS1Padding"

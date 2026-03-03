@@ -814,6 +814,8 @@ class Notifications private constructor(private val context: Context) {
             visibleReplyIntent.flags = Intent.FLAG_ACTIVITY_NEW_DOCUMENT
             val visibleReplyFlags =
                 PendingIntent.FLAG_CANCEL_CURRENT
+
+            @SuppressLint("UnspecifiedImmutableFlag")
             val visibleReplyPendingIntent = PendingIntent.getActivity(
                 context, (did + contact + "replyVisible").hashCode(),
                 visibleReplyIntent, visibleReplyFlags
