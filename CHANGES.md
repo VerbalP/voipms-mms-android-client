@@ -1,3 +1,7 @@
+### 0.6.33 ###
+
+* Update dependencies
+
 ### 0.6.32 ###
 
 * Bug fixes
