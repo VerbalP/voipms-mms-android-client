@@ -118,7 +118,7 @@ class DidPreferencesFragment : PreferenceFragmentCompat() {
                 object :
                     CompoundButton.OnCheckedChangeListener {
                     override fun onCheckedChanged(
-                        buttonView: CompoundButton?,
+                        buttonView: CompoundButton,
                         isChecked: Boolean
                     ) {
                         if (!::did.isInitialized) {

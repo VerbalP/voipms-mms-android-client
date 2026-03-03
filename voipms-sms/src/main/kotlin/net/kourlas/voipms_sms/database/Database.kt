@@ -46,11 +46,17 @@ import net.kourlas.voipms_sms.demo.getDemoNotification
 import net.kourlas.voipms_sms.sms.ConversationId
 import net.kourlas.voipms_sms.sms.Message
 import net.kourlas.voipms_sms.sms.workers.SyncWorker
-import net.kourlas.voipms_sms.utils.*
+import net.kourlas.voipms_sms.utils.CoroutineReadWriteLock
+import net.kourlas.voipms_sms.utils.getContactName
+import net.kourlas.voipms_sms.utils.getContactPhotoAdaptiveBitmap
+import net.kourlas.voipms_sms.utils.getDigitsOfString
+import net.kourlas.voipms_sms.utils.getFormattedPhoneNumber
+import net.kourlas.voipms_sms.utils.logException
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.util.*
+import java.util.Date
+import java.util.Locale
 
 
 /**
@@ -1071,7 +1077,7 @@ class Database private constructor(private val context: Context) {
                 DATABASE_NAME
             )
                 .addMigrations(migration9To10)
-                .fallbackToDestructiveMigration()
+                .fallbackToDestructiveMigration(true)
                 .build()
         }
     }

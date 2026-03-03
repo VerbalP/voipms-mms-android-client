@@ -22,7 +22,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
-import androidx.work.*
+import androidx.work.CoroutineWorker
+import androidx.work.ExistingWorkPolicy
+import androidx.work.ForegroundInfo
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
+import androidx.work.WorkManager
+import androidx.work.WorkerParameters
+import androidx.work.workDataOf
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 import com.squareup.moshi.JsonDataException
@@ -135,7 +142,7 @@ class RetrieveDidsWorker(context: Context, params: WorkerParameters) :
 
     @JsonClass(generateAdapter = true)
     data class DidResponse(
-        @Json(name = "sms_enabled") val smsEnabled: String?,
+        @param:Json(name = "sms_enabled") val smsEnabled: String?,
         val did: String
     )
 
