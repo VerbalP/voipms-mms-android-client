@@ -172,12 +172,13 @@ androidComponents {
                 )
             }.get()
 
-        tasks.matching { it.name == "${name}OssLicensesTask" }
-            .configureEach { generatePackageLicenses.dependsOn(this) }
+        tasks.matching { it.name == "${variant.name}OssLicensesTask" }
+            .configureEach {
+                this.dependsOn("cleanAssets")
+                generatePackageLicenses.dependsOn(this)
+            }
 
-        tasks.matching { it.name == "generate${name.capitalized()}Assets" }
+        tasks.matching { it.name == "generate${variant.name.capitalized()}Assets" }
             .configureEach { this.dependsOn(generatePackageLicenses) }
-
-        generatePackageLicenses.dependsOn("cleanAssets")
     }
 }
