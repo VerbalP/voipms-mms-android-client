@@ -20,11 +20,6 @@ configure<ApplicationExtension> {
         targetSdk = 36
         versionCode = 153
         versionName = "0.6.32"
-
-        ksp {
-            arg("room.schemaLocation", "$projectDir/schemas")
-            arg("room.incremental", "true")
-        }
     }
     flavorDimensions += "version"
     flavorDimensions += "demo"
@@ -60,14 +55,15 @@ configure<ApplicationExtension> {
             versionNameSuffix = "-demo"
         }
     }
-    androidComponents.beforeVariants {
-        it.enable = run {
-            val names = it.productFlavors.map { flavor ->
-                flavor.second
+    androidComponents.beforeVariants { variant ->
+        variant.enable = run {
+            val names = mutableListOf<String>()
+            for (flavor in variant.productFlavors) {
+                names.add(flavor.second)
             }
             val isDemo =
                 names.contains("demoSending") || names.contains("demoNotSending")
-            val isRelease = it.buildType == "release"
+            val isRelease = variant.buildType == "release"
             val isPrimary = names.contains("primary")
             !isDemo || (!isPrimary && !isRelease)
         }
@@ -95,6 +91,11 @@ configure<ApplicationExtension> {
         abortOnError = false
     }
     namespace = "net.kourlas.voipms_sms"
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+    arg("room.incremental", "true")
 }
 
 dependencies {
