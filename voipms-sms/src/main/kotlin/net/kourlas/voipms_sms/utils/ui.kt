@@ -36,6 +36,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.graphics.createBitmap
 import androidx.fragment.app.FragmentActivity
 import com.google.android.material.snackbar.Snackbar
 import me.saket.bettermovementmethod.BetterLinkMovementMethod
@@ -46,11 +47,7 @@ import kotlin.math.abs
  * Applies a circular mask to a bitmap.
  */
 fun applyCircularMask(bitmap: Bitmap): Bitmap {
-    val output = Bitmap.createBitmap(
-        bitmap.width,
-        bitmap.height,
-        Bitmap.Config.ARGB_8888
-    )
+    val output = createBitmap(bitmap.width, bitmap.height)
     val canvas = Canvas(output)
     val paint = Paint()
     val rect = Rect(0, 0, bitmap.width, bitmap.height)

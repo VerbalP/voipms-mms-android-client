@@ -18,19 +18,31 @@
 package net.kourlas.voipms_sms.newConversation
 
 import android.graphics.Bitmap
-import android.net.Uri
 import android.provider.ContactsContract
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.*
+import android.widget.Filter
+import android.widget.Filterable
+import android.widget.ImageView
+import android.widget.QuickContactBadge
+import android.widget.TextView
+import androidx.core.net.toUri
 import androidx.recyclerview.widget.RecyclerView
 import net.kourlas.voipms_sms.BuildConfig
 import net.kourlas.voipms_sms.R
 import net.kourlas.voipms_sms.demo.getNewConversationContacts
 import net.kourlas.voipms_sms.ui.FastScroller
-import net.kourlas.voipms_sms.utils.*
-import java.util.*
+import net.kourlas.voipms_sms.utils.applyCircularMask
+import net.kourlas.voipms_sms.utils.getBitmapFromUri
+import net.kourlas.voipms_sms.utils.getContactInitial
+import net.kourlas.voipms_sms.utils.getDigitsOfString
+import net.kourlas.voipms_sms.utils.getFormattedPhoneNumber
+import net.kourlas.voipms_sms.utils.getGenericContactPhotoBitmap
+import net.kourlas.voipms_sms.utils.getPhoneNumberType
+import net.kourlas.voipms_sms.utils.logException
+import net.kourlas.voipms_sms.utils.showSnackbar
+import java.util.Locale
 
 /**
  * Recycler view adapter used by [NewConversationActivity].
@@ -516,7 +528,7 @@ class NewConversationRecyclerViewAdapter(
                         val bitmap = photoUri?.let {
                             getBitmapFromUri(
                                 activity,
-                                Uri.parse(it),
+                                it.toUri(),
                                 activity.resources.getDimensionPixelSize(
                                     R.dimen.contact_badge
                                 )
@@ -533,7 +545,7 @@ class NewConversationRecyclerViewAdapter(
                         )
 
                         val previousContactItem =
-                            if (allContactItems.size > 0) {
+                            if (allContactItems.isNotEmpty()) {
                                 allContactItems.last()
                             } else {
                                 null

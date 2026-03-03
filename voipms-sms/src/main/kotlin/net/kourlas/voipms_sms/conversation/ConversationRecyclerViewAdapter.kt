@@ -692,7 +692,7 @@ class ConversationRecyclerViewAdapter(
      *
      * @param itemView The primary view of the message item.
      */
-    inner class MessageViewHolder internal constructor(
+    class MessageViewHolder internal constructor(
         itemView: View,
         viewType: Int
     ) : RecyclerView.ViewHolder(

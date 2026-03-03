@@ -36,8 +36,14 @@ import com.google.android.material.textfield.TextInputEditText
 import kotlinx.coroutines.runBlocking
 import net.kourlas.voipms_sms.R
 import net.kourlas.voipms_sms.database.Database
-import net.kourlas.voipms_sms.preferences.*
+import net.kourlas.voipms_sms.preferences.accountConfigured
 import net.kourlas.voipms_sms.preferences.activities.AccountPreferencesActivity
+import net.kourlas.voipms_sms.preferences.didsConfigured
+import net.kourlas.voipms_sms.preferences.firstRun
+import net.kourlas.voipms_sms.preferences.setEmail
+import net.kourlas.voipms_sms.preferences.setFirstRun
+import net.kourlas.voipms_sms.preferences.setFirstSyncAfterSignIn
+import net.kourlas.voipms_sms.preferences.setPassword
 import net.kourlas.voipms_sms.sms.workers.RetrieveDidsWorker
 import net.kourlas.voipms_sms.sms.workers.VerifyCredentialsWorker
 import net.kourlas.voipms_sms.utils.registerNonExportedReceiver
@@ -305,7 +311,7 @@ class SignInActivity : AppCompatActivity() {
                 if (blockFinish()) {
                     return true
                 }
-                return super.onOptionsItemSelected(item)
+                super.onOptionsItemSelected(item)
             }
 
             else -> super.onOptionsItemSelected(item)

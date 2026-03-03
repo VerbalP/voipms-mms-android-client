@@ -27,7 +27,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
-import android.net.Uri
 import android.os.Build
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
@@ -37,6 +36,7 @@ import androidx.core.app.RemoteInput
 import androidx.core.app.TaskStackBuilder
 import androidx.core.content.LocusIdCompat
 import androidx.core.graphics.drawable.IconCompat
+import androidx.core.net.toUri
 import androidx.work.WorkManager
 import net.kourlas.voipms_sms.BuildConfig
 import net.kourlas.voipms_sms.CustomApplication
@@ -627,7 +627,7 @@ class Notifications private constructor(private val context: Context) {
             @Suppress("DEPRECATION")
             val notificationSound = getNotificationSound(context)
             if (notificationSound != "") {
-                notification.setSound(Uri.parse(notificationSound))
+                notification.setSound(notificationSound.toUri())
             } else {
                 notification.setSilent(true)
             }
@@ -812,13 +812,8 @@ class Notifications private constructor(private val context: Context) {
                 ), true
             )
             visibleReplyIntent.flags = Intent.FLAG_ACTIVITY_NEW_DOCUMENT
-            @SuppressLint("ObsoleteSdkInt")
             val visibleReplyFlags =
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    PendingIntent.FLAG_CANCEL_CURRENT or PendingIntent.FLAG_MUTABLE
-                } else {
-                    PendingIntent.FLAG_CANCEL_CURRENT
-                }
+                PendingIntent.FLAG_CANCEL_CURRENT
             val visibleReplyPendingIntent = PendingIntent.getActivity(
                 context, (did + contact + "replyVisible").hashCode(),
                 visibleReplyIntent, visibleReplyFlags

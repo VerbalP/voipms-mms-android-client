@@ -51,7 +51,7 @@ import kotlin.math.min
 @SuppressLint("InflateParams")
 class FastScroller private constructor(
     private val mRv: RecyclerView,
-    private val mViewGroupOverlay: ViewGroupOverlay,
+    mViewGroupOverlay: ViewGroupOverlay,
     position: Int
 ) :
     RecyclerView.OnScrollListener(), OnLayoutChangeListener,

@@ -28,7 +28,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -55,9 +54,11 @@ import androidx.core.app.ActivityCompat
 import androidx.core.app.TaskStackBuilder
 import androidx.core.content.ContextCompat
 import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.net.toUri
 import androidx.core.text.toSpannable
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.isGone
 import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -370,7 +371,7 @@ open class ConversationActivity(val bubble: Boolean = false) :
         // Allow contact phone number to be copied by long clicking the toolbar
         findViewById<Toolbar>(R.id.toolbar).setOnLongClickListener {
             val clipboard = getSystemService(
-                Context.CLIPBOARD_SERVICE
+                CLIPBOARD_SERVICE
             ) as ClipboardManager
             val clip = ClipData.newPlainText(
                 getString(R.string.conversation_contact_clipboard_description),
@@ -746,7 +747,7 @@ open class ConversationActivity(val bubble: Boolean = false) :
         )
         didMenuItem.setOnMenuItemClickListener {
             val clipboard = getSystemService(
-                Context.CLIPBOARD_SERVICE
+                CLIPBOARD_SERVICE
             ) as ClipboardManager
             val clip = ClipData.newPlainText(
                 getString(R.string.conversation_did_clipboard_description),
@@ -923,7 +924,7 @@ open class ConversationActivity(val bubble: Boolean = false) :
      */
     private fun onCallButtonClick() {
         val intent = Intent(Intent.ACTION_CALL)
-        intent.data = Uri.parse("tel:$contact")
+        intent.data = "tel:$contact".toUri()
 
         // Before trying to call the contact's phone number, request the
         // CALL_PHONE permission
@@ -1004,7 +1005,7 @@ open class ConversationActivity(val bubble: Boolean = false) :
             )
                 .toJson(ExportableMessages(messages))
             val clipboard = getSystemService(
-                Context.CLIPBOARD_SERVICE
+                CLIPBOARD_SERVICE
             ) as ClipboardManager
             val clip = ClipData.newPlainText(
                 getString(
@@ -1220,7 +1221,7 @@ open class ConversationActivity(val bubble: Boolean = false) :
         // Copy text of message to clipboard
         if (message != null) {
             val clipboard = getSystemService(
-                Context.CLIPBOARD_SERVICE
+                CLIPBOARD_SERVICE
             ) as ClipboardManager
             val clip = ClipData.newPlainText(
                 getString(R.string.conversation_message_clipboard_description),
@@ -1341,7 +1342,7 @@ open class ConversationActivity(val bubble: Boolean = false) :
             val date = getRecyclerViewContainingItem(
                 view
             ).findViewById<TextView>(R.id.date)
-            if (date.visibility == View.GONE) {
+            if (date.isGone) {
                 date.visibility = View.VISIBLE
             } else {
                 date.visibility = View.GONE

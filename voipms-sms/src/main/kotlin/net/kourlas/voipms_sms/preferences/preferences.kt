@@ -25,6 +25,7 @@ import android.content.SharedPreferences
 import android.os.Build.VERSION
 import android.os.Build.VERSION_CODES
 import android.util.Base64
+import androidx.core.content.edit
 import androidx.preference.PreferenceManager
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
@@ -517,15 +518,16 @@ private fun setBooleanPreference(
     value: Boolean
 ) {
     PreferenceManager.getDefaultSharedPreferences(context.applicationContext)
-        .edit().putBoolean(key, value).apply()
+        .edit { putBoolean(key, value) }
 }
 
 private fun setSecureStringPreference(
     context: Context, key: String,
     value: String
 ) = synchronized(securePreferencesLock) {
-    getEncryptedSharedPreferences(context.applicationContext).edit()
-        .putString(key, value).apply()
+    getEncryptedSharedPreferences(context.applicationContext).edit {
+        putString(key, value)
+    }
 }
 
 private fun setStringPreference(
@@ -533,12 +535,12 @@ private fun setStringPreference(
     value: String
 ) {
     PreferenceManager.getDefaultSharedPreferences(context.applicationContext)
-        .edit().putString(key, value).apply()
+        .edit { putString(key, value) }
 }
 
 private fun setLongPreference(context: Context, key: String, value: Long) {
     PreferenceManager.getDefaultSharedPreferences(context.applicationContext)
-        .edit().putLong(key, value).apply()
+        .edit { putLong(key, value) }
 }
 
 private fun setStringSetPreference(
@@ -546,7 +548,7 @@ private fun setStringSetPreference(
     value: Set<String>
 ) {
     PreferenceManager.getDefaultSharedPreferences(context.applicationContext)
-        .edit().putStringSet(key, value).apply()
+        .edit { putStringSet(key, value) }
 }
 
 private fun getEncryptedSharedPreferences(context: Context): SharedPreferences {
@@ -571,7 +573,7 @@ private fun getEncryptedSharedPreferences(context: Context): SharedPreferences {
                 context.packageName
             ),
             Context.MODE_PRIVATE
-        ).edit().clear().apply()
+        ).edit { clear() }
         return EncryptedSharedPreferences.create(
             context,
             context.getString(
@@ -587,7 +589,7 @@ private fun getEncryptedSharedPreferences(context: Context): SharedPreferences {
 
 fun removePreference(context: Context, key: String) {
     PreferenceManager.getDefaultSharedPreferences(context.applicationContext)
-        .edit().remove(key).apply()
+        .edit { remove(key) }
 }
 
 private const val LEGACY_KEYSTORE_TYPE = "AndroidKeyStore"
@@ -623,8 +625,9 @@ fun migrateLegacySecurePreferences(context: Context) = synchronized(
         val plainTextPreference =
             getStringPreference(context, preferenceKey, "")
         if (plainTextPreference != "") {
-            getEncryptedSharedPreferences(context).edit()
-                .putString(preferenceKey, plainTextPreference).apply()
+            getEncryptedSharedPreferences(context).edit {
+                putString(preferenceKey, plainTextPreference)
+            }
             continue
         }
 
@@ -650,17 +653,11 @@ fun migrateLegacySecurePreferences(context: Context) = synchronized(
             }
 
             // Decrypt the encrypted value.
-            val cipher = if (VERSION.SDK_INT >= VERSION_CODES.M) {
+            val cipher =
                 Cipher.getInstance(
                     LEGACY_KEY_TRANSFORMATION_ALGORITHM,
                     LEGACY_KEY_CIPHER_MARSHMALLOW_PROVIDER
                 )
-            } else {
-                Cipher.getInstance(
-                    LEGACY_KEY_TRANSFORMATION_ALGORITHM,
-                    LEGACY_KEY_CIPHER_JELLYBEAN_PROVIDER
-                )
-            }
             cipher.init(Cipher.DECRYPT_MODE, privateKey)
 
             val decryptedValue = CipherInputStream(
@@ -671,8 +668,9 @@ fun migrateLegacySecurePreferences(context: Context) = synchronized(
                     )
                 ), cipher
             ).bufferedReader().use { it.readText() }
-            getEncryptedSharedPreferences(context).edit()
-                .putString(preferenceKey, decryptedValue).apply()
+            getEncryptedSharedPreferences(context).edit {
+                putString(preferenceKey, decryptedValue)
+            }
             continue
         } catch (e: Exception) {
             // Do nothing.
@@ -689,7 +687,7 @@ fun migrateLegacySecurePreferences(context: Context) = synchronized(
         context.getSharedPreferences(
             LEGACY_SECURE_SHARED_PREFERENCES_NAME,
             Context.MODE_PRIVATE
-        ).edit().clear().apply()
+        ).edit { clear() }
         if (VERSION.SDK_INT >= VERSION_CODES.N) {
             context.deleteSharedPreferences(
                 LEGACY_SECURE_SHARED_PREFERENCES_NAME

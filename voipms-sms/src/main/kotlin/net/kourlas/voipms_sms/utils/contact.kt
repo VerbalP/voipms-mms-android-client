@@ -28,6 +28,9 @@ import android.graphics.Typeface
 import android.net.Uri
 import android.provider.ContactsContract
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.scale
+import androidx.core.net.toUri
 import net.kourlas.voipms_sms.BuildConfig
 import net.kourlas.voipms_sms.R
 import net.kourlas.voipms_sms.demo.getNewConversationContacts
@@ -109,7 +112,7 @@ fun getContactPhotoBitmap(
 
         val photoUri = getContactPhotoUri(context, phoneNumber)
         if (photoUri != null) {
-            val bitmap = getBitmapFromUri(context, Uri.parse(photoUri), size)
+            val bitmap = getBitmapFromUri(context, photoUri.toUri(), size)
             if (bitmap != null) {
                 if (contactBitmapCache != null) {
                     contactBitmapCache[phoneNumber] = bitmap
@@ -134,7 +137,7 @@ fun getGenericContactPhotoBitmap(
     phoneNumber: String,
     size: Int
 ): Bitmap {
-    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val bitmap = createBitmap(size, size)
     bitmap.eraseColor(getMaterialDesignColour(getDigitsOfString(phoneNumber)))
     val canvas = Canvas(bitmap)
 
@@ -184,14 +187,12 @@ fun getContactPhotoAdaptiveBitmap(
         ),
         contactBitmapCache
     )
-    val adaptiveBitmap = Bitmap.createBitmap(
+    val adaptiveBitmap = createBitmap(
         context.resources.getDimensionPixelSize(
             R.dimen.adaptive_icon_drawable_outer
-        ),
-        context.resources.getDimensionPixelSize(
+        ), context.resources.getDimensionPixelSize(
             R.dimen.adaptive_icon_drawable_outer
-        ),
-        Bitmap.Config.ARGB_8888
+        )
     )
     adaptiveBitmap.eraseColor(Color.TRANSPARENT)
     val adaptiveCanvas = Canvas(adaptiveBitmap)
@@ -298,7 +299,7 @@ fun getBitmapFromUri(context: Context, uri: Uri, size: Int): Bitmap? {
             context.contentResolver.openInputStream(uri), null, options
         )
             ?: return null
-        return Bitmap.createScaledBitmap(bitmap, size, size, true)
+        return bitmap.scale(size, size)
     } catch (e: Exception) {
         return null
     }

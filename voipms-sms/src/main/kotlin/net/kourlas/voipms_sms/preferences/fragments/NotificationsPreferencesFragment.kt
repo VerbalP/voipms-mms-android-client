@@ -24,6 +24,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.net.toUri
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import net.kourlas.voipms_sms.R
@@ -99,9 +100,7 @@ class NotificationsPreferencesFragment : PreferenceFragmentCompat(),
                                         intent.putExtra(
                                             RingtoneManager
                                                 .EXTRA_RINGTONE_EXISTING_URI,
-                                            Uri.parse(
-                                                getNotificationSound(it)
-                                            )
+                                            getNotificationSound(it).toUri()
                                         )
                                     }
                                     ringtoneActivityResultLauncher.launch(
@@ -167,7 +166,7 @@ class NotificationsPreferencesFragment : PreferenceFragmentCompat(),
                 } else {
                     try {
                         val ringtone = RingtoneManager.getRingtone(
-                            activity, Uri.parse(notificationSound)
+                            activity, notificationSound.toUri()
                         )
                         if (ringtone != null) {
                             preference.summary = ringtone.getTitle(
