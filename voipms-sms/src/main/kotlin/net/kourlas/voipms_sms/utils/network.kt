@@ -63,7 +63,7 @@ suspend inline fun <reified T> httpPostWithMultipartFormData(
                 throw IOException("Unexpected code $response")
             }
 
-            return@use adapter.fromJson(response.body!!.source())
+            return@use adapter.fromJson(response.body.source())
         }
     }
 }

@@ -33,11 +33,13 @@ import net.kourlas.voipms_sms.utils.subscribeToDidTopics
 import java.io.ByteArrayInputStream
 import java.security.KeyStore
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 import javax.crypto.Cipher
 import javax.crypto.CipherInputStream
 
-private val securePreferencesLock = Object()
+private val securePreferencesLock = Any()
 
 fun firstRun(context: Context): Boolean = getBooleanPreference(
     context,
