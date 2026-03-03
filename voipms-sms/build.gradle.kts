@@ -98,46 +98,43 @@ configure<ApplicationExtension> {
 }
 
 dependencies {
-    val roomVersion = "2.8.4"
-    val moshiVersion = "1.15.2"
-
     // Kotlin libraries
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
+    implementation(libs.kotlinx.coroutines.android)
 
     // Android support libraries
-    implementation("androidx.annotation:annotation:1.9.1")
-    implementation("androidx.appcompat:appcompat:1.7.0")
-    implementation("androidx.compose.ui:ui:1.7.6")
-    implementation("androidx.core:core-ktx:1.15.0")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7")
-    implementation("androidx.preference:preference-ktx:1.2.1")
-    implementation("androidx.recyclerview:recyclerview:1.4.0")
-    implementation("androidx.room:room-ktx:$roomVersion")
-    implementation("androidx.room:room-runtime:$roomVersion")
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
-    implementation("androidx.sharetarget:sharetarget:1.2.0")
-    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
-    implementation("androidx.work:work-runtime-ktx:2.10.0")
-    implementation("com.google.android.material:material:1.12.0")
-    ksp("androidx.room:room-compiler:$roomVersion")
+    implementation(libs.androidx.annotation)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.preference.ktx)
+    implementation(libs.androidx.recyclerview)
+    implementation(libs.androidx.room.ktx)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.security.crypto)
+    implementation(libs.androidx.sharetarget)
+    implementation(libs.androidx.swiperefreshlayout)
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.material)
+    ksp(libs.androidx.room.compiler)
 
     // fdroid-remove-start
 
     // Google and Firebase libraries
-    "primaryImplementation"("com.google.android.gms:play-services-base:18.5.0")
-    "primaryImplementation"(platform("com.google.firebase:firebase-bom:33.8.0"))
-    "primaryImplementation"("com.google.firebase:firebase-messaging-ktx")
+    "primaryImplementation"(libs.google.gms.playServicesBase)
+    "primaryImplementation"(platform(libs.google.firebase.bom))
+    "primaryImplementation"(libs.google.firebase.messaging.ktx)
 
     // fdroid-remove-end
 
     // Other third-party libraries
-    implementation("com.squareup.moshi:moshi-adapters:$moshiVersion")
-    implementation("com.squareup.moshi:moshi:$moshiVersion")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.github.mukeshsolanki:MarkdownView-Android:2.0.0")
-    implementation("com.github.xabaras:RecyclerViewSwipeDecorator:1.3")
-    implementation("me.saket:better-link-movement-method:2.2.0")
-    ksp("com.squareup.moshi:moshi-kotlin-codegen:$moshiVersion")
+    implementation(libs.moshi.adapters)
+    implementation(libs.moshi)
+    implementation(libs.okhttp)
+    implementation(libs.mukeshsolanki.markdownView)
+    implementation(libs.xabaras.recyclerViewSwipeDecorator)
+    implementation(libs.saket.betterLinkMovementMethod)
+    ksp(libs.moshi.kotlin.codegen)
 }
 
 tasks.register<Delete>("cleanAssets") {
