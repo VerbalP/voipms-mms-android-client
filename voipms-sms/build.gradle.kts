@@ -16,7 +16,7 @@ android {
     compileSdk = 35
     defaultConfig {
         applicationId = "net.kourlas.voipms_sms"
-        minSdk = 21
+        minSdk = 23
         targetSdk = 35
         versionCode = 153
         versionName = "0.6.32"
@@ -101,7 +101,7 @@ android {
 }
 
 dependencies {
-    val roomVersion = "2.6.1"
+    val roomVersion = "2.8.4"
     val moshiVersion = "1.15.2"
 
     // Kotlin libraries
