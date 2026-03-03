@@ -2,13 +2,13 @@ import com.android.build.api.dsl.ApplicationExtension
 import org.gradle.internal.extensions.stdlib.capitalized
 
 plugins {
-    id("com.google.devtools.ksp")
-    id("org.jetbrains.kotlin.plugin.compose")
-    id("com.android.application")
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.google.devtools.ksp)
     id("net.kourlas.oss-licenses-plugin")
 
     // fdroid-remove-start
-    id("com.google.gms.google-services")
+    alias(libs.plugins.google.gms.googleServices)
     // fdroid-remove-end
 }
 
