@@ -60,6 +60,7 @@ import net.kourlas.voipms_sms.utils.getContactName
 import net.kourlas.voipms_sms.utils.httpPostWithMultipartFormData
 import net.kourlas.voipms_sms.utils.logException
 import net.kourlas.voipms_sms.utils.normalizeVoipMsPhoneNumber
+import net.kourlas.voipms_sms.utils.stripSlashes
 import net.kourlas.voipms_sms.utils.toBoolean
 import net.kourlas.voipms_sms.utils.validatePhoneNumber
 import java.io.IOException
@@ -282,6 +283,7 @@ class SyncWorker(context: Context, params: WorkerParameters) :
         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         sdf.timeZone = TimeZone.getTimeZone("America/New_York")
         for (period in periods) {
+            // Fetch MMS (includes media but may miss emoji text)
             encodedDids
                 .map {
                     mapOf(
@@ -294,7 +296,25 @@ class SyncWorker(context: Context, params: WorkerParameters) :
                         "to" to sdf.format(period.second),
                         "timezone" to "-5",
                         "all_messages" to "1",
-                    ) // -5 corresponds to EDT
+                    )
+                }
+                .mapTo(retrievalRequests) {
+                    RetrievalRequest(it, period)
+                }
+            // Also fetch SMS (has correct emoji text)
+            encodedDids
+                .map {
+                    mapOf(
+                        "api_username" to getEmail(applicationContext),
+                        "api_password" to getPassword(applicationContext),
+                        "method" to "getSMS",
+                        "did" to it,
+                        "limit" to "1000000",
+                        "from" to sdf.format(period.first),
+                        "to" to sdf.format(period.second),
+                        "timezone" to "-5",
+                        "all_messages" to "1",
+                    )
                 }
                 .mapTo(retrievalRequests) {
                     RetrievalRequest(it, period)
@@ -341,6 +361,30 @@ class SyncWorker(context: Context, params: WorkerParameters) :
             }
         }
 
+        // Merge getMMS and getSMS results: prefer SMS text when MMS
+        // text is empty (VoIP.ms API drops emoji text in getMMS)
+        val mergedMessages = incomingMessages
+            .groupBy { it.voipId }
+            .map { (_, msgs) ->
+                if (msgs.size == 1) msgs.first()
+                else {
+                    val mms = msgs.firstOrNull {
+                        !it.media1.isNullOrEmpty()
+                            || !it.media2.isNullOrEmpty()
+                            || !it.media3.isNullOrEmpty()
+                    } ?: msgs.first()
+                    val sms = msgs.firstOrNull {
+                        !it.text.isNullOrEmpty()
+                    } ?: msgs.first()
+                    IncomingMessage(
+                        mms.voipId, mms.date, mms.isIncoming,
+                        mms.did, mms.contact,
+                        if (mms.text.isNullOrEmpty()) sms.text else mms.text,
+                        mms.media1, mms.media2, mms.media3
+                    )
+                }
+            }
+
         // Add new messages from the server
         val newConversationIds: Set<ConversationId>
         try {
@@ -348,7 +392,7 @@ class SyncWorker(context: Context, params: WorkerParameters) :
                 applicationContext
             )
                 .insertMessagesVoipMsApi(
-                    incomingMessages,
+                    mergedMessages,
                     retrieveDeletedMessages
                 )
         } catch (e: Exception) {
@@ -367,7 +411,7 @@ class SyncWorker(context: Context, params: WorkerParameters) :
             val contactsOnly = getAutoDownloadContactsOnly(
                 applicationContext
             )
-            for (msg in incomingMessages) {
+            for (msg in mergedMessages) {
                 if (!msg.isIncoming) continue
                 if (contactsOnly && getContactName(
                         applicationContext, msg.contact
@@ -459,7 +503,7 @@ class SyncWorker(context: Context, params: WorkerParameters) :
                         toBoolean(message.type),
                         normalizeVoipMsPhoneNumber(message.did),
                         normalizeVoipMsPhoneNumber(message.contact),
-                        message.message,
+                        stripSlashes(message.message),
                         message.col_media1,
                         message.col_media2,
                         message.col_media3

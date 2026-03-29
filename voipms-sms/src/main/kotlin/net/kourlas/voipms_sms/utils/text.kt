@@ -51,3 +51,30 @@ fun getMessageTexts(context: Context, message: String): List<String> {
     messageTexts.add(String(bytes.toByteArray(), Charsets.UTF_8))
     return messageTexts
 }
+
+/**
+ * Removes backslash escaping from a string, equivalent to PHP's
+ * stripslashes(). Applied repeatedly until stable, to handle the
+ * multiple layers of escaping that the VoIP.ms API sometimes applies.
+ */
+fun stripSlashes(text: String?): String? {
+    if (text == null) return null
+    var result: String = text
+    var previous: String
+    do {
+        previous = result
+        result = buildString {
+            var i = 0
+            while (i < previous.length) {
+                if (previous[i] == '\\' && i + 1 < previous.length) {
+                    append(previous[i + 1])
+                    i += 2
+                } else {
+                    append(previous[i])
+                    i++
+                }
+            }
+        }
+    } while (result != previous)
+    return result
+}

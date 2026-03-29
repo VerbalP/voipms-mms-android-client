@@ -316,10 +316,17 @@ class SendMessageWorker(context: Context, params: WorkerParameters) :
 
             val hasMedia = mediaFiles.isNotEmpty()
 
+            val smsMaxBytes = applicationContext.resources.getInteger(
+                R.integer.sms_max_length
+            )
+            val textExceedsSms = message.text
+                .toByteArray(Charsets.UTF_8).size > smsMaxBytes
+            val useMms = hasMedia || textExceedsSms
+
             val formData = mutableMapOf(
                 "api_username" to getEmail(applicationContext),
                 "api_password" to getPassword(applicationContext),
-                "method" to if (hasMedia) "sendMMS" else "sendSMS",
+                "method" to if (useMms) "sendMMS" else "sendSMS",
                 "did" to message.did,
                 "dst" to message.contact,
                 "message" to message.text.ifEmpty {

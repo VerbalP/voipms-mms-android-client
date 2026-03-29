@@ -96,14 +96,12 @@ import net.kourlas.voipms_sms.utils.applyRoundedCornersMask
 import net.kourlas.voipms_sms.utils.getContactName
 import net.kourlas.voipms_sms.utils.getContactPhotoBitmap
 import net.kourlas.voipms_sms.utils.getFormattedPhoneNumber
-import net.kourlas.voipms_sms.utils.getMessageTexts
 import net.kourlas.voipms_sms.utils.registerNonExportedReceiver
 import net.kourlas.voipms_sms.utils.safeUnregisterReceiver
 import net.kourlas.voipms_sms.utils.showAlertDialog
 import net.kourlas.voipms_sms.utils.showPermissionSnackbar
 import net.kourlas.voipms_sms.utils.showSnackbar
 import java.io.File
-import java.text.BreakIterator
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -558,44 +556,18 @@ open class ConversationActivity(val bubble: Boolean = false) :
             R.id.chars_remaining_text
         )
 
-        // VoIP.ms uses UTF-8 encoding for text messages; any message
-        // exceeding N bytes when encoded using UTF-8 is too long
-        var msgsCount = 1
-        var bytesCount = 0
-        val boundary = BreakIterator.getCharacterInstance(Locale.getDefault())
-        boundary.setText(newText)
-        var current = boundary.first()
-        var next = boundary.next()
-        while (next != BreakIterator.DONE) {
-            val cluster = newText.substring(current, next)
-            val clusterBytes = cluster.toByteArray(Charsets.UTF_8)
-            if (bytesCount + clusterBytes.size > maxLength) {
-                msgsCount += 1
-                bytesCount = 0
-            }
-            bytesCount += clusterBytes.size
-            current = next
-            next = boundary.next()
-        }
+        val charCount = newText.length
+        val bytesCount = newText.toByteArray(Charsets.UTF_8).size
 
-        if (msgsCount == 1) {
-            if (bytesCount >= maxLength - 10) {
-                // Show "N" when there are N characters left in the first
-                // message and N <= 10
-                charsRemainingTextView.visibility = View.VISIBLE
-                charsRemainingTextView.text = "${maxLength - bytesCount}"
-            } else {
-                // Show nothing
-                charsRemainingTextView.visibility = View.GONE
-            }
-        } else {
-            // Show "N / M" when there are M messages and M >= 2; N is the
-            // number of characters left in the current message
+        if (bytesCount > maxLength) {
             charsRemainingTextView.visibility = View.VISIBLE
-            charsRemainingTextView.text = getString(
-                R.string.conversation_char_rem,
-                maxLength - bytesCount, msgsCount
-            )
+            charsRemainingTextView.text = "$charCount/2048\nMMS"
+        } else if (bytesCount >= maxLength - 10) {
+            // Approaching SMS limit — show remaining bytes
+            charsRemainingTextView.visibility = View.VISIBLE
+            charsRemainingTextView.text = "${maxLength - bytesCount}"
+        } else {
+            charsRemainingTextView.visibility = View.GONE
         }
 
         CustomApplication.getApplication().applicationScope.launch(Dispatchers.Default) {
@@ -777,7 +749,14 @@ open class ConversationActivity(val bubble: Boolean = false) :
                 val media2 = mediaPaths.getOrElse(1) { "" }
                 val media3 = mediaPaths.getOrElse(2) { "" }
 
-                val ids = if (mediaPaths.isNotEmpty()) {
+                val smsMaxBytes = resources.getInteger(
+                    R.integer.sms_max_length
+                )
+                val textExceedsSms = messageText
+                    .toByteArray(Charsets.UTF_8).size > smsMaxBytes
+
+                val ids = if (mediaPaths.isNotEmpty() || textExceedsSms) {
+                    // MMS: single message (media or long text)
                     Database.getInstance(applicationContext)
                         .insertConversationMessagesDeliveryInProgress(
                             ConversationId(did, contact),
@@ -785,11 +764,11 @@ open class ConversationActivity(val bubble: Boolean = false) :
                             media1, media2, media3
                         )
                 } else {
-                    // SMS: split text if needed
+                    // SMS: short text
                     Database.getInstance(applicationContext)
                         .insertConversationMessagesDeliveryInProgress(
                             ConversationId(did, contact),
-                            getMessageTexts(applicationContext, messageText)
+                            listOf(messageText)
                         )
                 }
                 SendMessageWorker.sendMessages(applicationContext, ids)
