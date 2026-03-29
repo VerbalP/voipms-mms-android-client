@@ -63,9 +63,13 @@
     <string name="preferences_sync_retrieve_deleted_messages_summary">Retrieve messages from VoIP.ms that were deleted locally</string>
     <string name="preferences_sync_retrieve_deleted_messages_default_value" translatable="false">false</string>
     <string name="preferences_sync_auto_download_mms_images_key" translatable="false">sync_auto_download_mms_images</string>
-    <string name="preferences_sync_auto_download_mms_images_title">Auto-download MMS images</string>
-    <string name="preferences_sync_auto_download_mms_images_summary">Download and save images received via MMS automatically (without click on the download button)</string>
+    <string name="preferences_sync_auto_download_mms_images_title">Always download MMS media files</string>
+    <string name="preferences_sync_auto_download_mms_images_summary">Automatically download all MMS media files (images, audio, video) without requiring a manual tap</string>
     <string name="preferences_sync_auto_download_mms_images_default_value" translatable="false">false</string>
+    <string name="preferences_sync_auto_download_contacts_only_key" translatable="false">sync_auto_download_contacts_only</string>
+    <string name="preferences_sync_auto_download_contacts_only_title">Download automatically from contacts only</string>
+    <string name="preferences_sync_auto_download_contacts_only_summary">Only auto-download media from senders who are in your phone contacts</string>
+    <string name="preferences_sync_auto_download_contacts_only_default_value" translatable="false">false</string>
 
     <!-- Notifications -->
     <string name="preferences_notifications_category_name">Notifications</string>

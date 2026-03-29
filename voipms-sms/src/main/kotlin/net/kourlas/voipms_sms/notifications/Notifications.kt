@@ -34,6 +34,8 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
 import androidx.core.app.RemoteInput
 import androidx.core.app.TaskStackBuilder
+import android.net.Uri
+import androidx.core.content.FileProvider
 import androidx.core.content.LocusIdCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.core.net.toUri
@@ -60,7 +62,11 @@ import net.kourlas.voipms_sms.utils.getContactName
 import net.kourlas.voipms_sms.utils.getContactPhotoAdaptiveBitmap
 import net.kourlas.voipms_sms.utils.getContactPhotoBitmap
 import net.kourlas.voipms_sms.utils.getFormattedPhoneNumber
+import net.kourlas.voipms_sms.utils.getMediaExtension
+import net.kourlas.voipms_sms.utils.getMediaType
+import net.kourlas.voipms_sms.utils.MediaType
 import net.kourlas.voipms_sms.utils.logException
+import java.io.File
 import java.util.Date
 import java.util.UUID
 
@@ -701,7 +707,7 @@ class Notifications private constructor(private val context: Context) {
             }
         } else if (messagesToAdd.isNotEmpty()) {
             val notificationMessages = messagesToAdd.map {
-                NotificationCompat.MessagingStyle.Message(
+                val msg = NotificationCompat.MessagingStyle.Message(
                     it.summaryDisplayText,
                     it.date.time,
                     if (it.isIncoming)
@@ -713,6 +719,16 @@ class Notifications private constructor(private val context: Context) {
                             .build()
                     else null
                 )
+                // Attach image to notification if cached
+                try {
+                    val imageUri = getNotificationImageUri(it)
+                    if (imageUri != null) {
+                        msg.setData("image/jpeg", imageUri)
+                    }
+                } catch (_: Exception) {
+                    // Ignore — show notification without image
+                }
+                msg
             }
             for (message in notificationMessages) {
                 style.addMessage(message)
@@ -1038,6 +1054,29 @@ class Notifications private constructor(private val context: Context) {
                 )
             }
         }
+    }
+
+    /**
+     * Returns a content URI for the first image media of a message,
+     * if it exists in cache. Used to display images in notifications.
+     */
+    private fun getNotificationImageUri(message: Message): Uri? {
+        val mediaUrl = message.media1
+        if (mediaUrl.isEmpty()) return null
+
+        val ext = getMediaExtension(mediaUrl)
+        val type = getMediaType(ext)
+        if (type != MediaType.IMAGE && type != MediaType.GIF) return null
+
+        val hash = mediaUrl.hashCode().toUInt().toString(16)
+        val cacheFile = File(File(context.cacheDir, "media"), "$hash.$ext")
+        if (!cacheFile.exists()) return null
+
+        return FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            cacheFile
+        )
     }
 
     companion object {

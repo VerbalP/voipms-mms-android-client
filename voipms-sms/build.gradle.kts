@@ -132,6 +132,7 @@ dependencies {
     implementation(libs.moshi.adapters)
     implementation(libs.moshi)
     implementation(libs.coil)
+    implementation(libs.coil.gif)
     implementation(libs.coil.network.okhttp)
     implementation(libs.okhttp)
     implementation(libs.mukeshsolanki.markdownView)

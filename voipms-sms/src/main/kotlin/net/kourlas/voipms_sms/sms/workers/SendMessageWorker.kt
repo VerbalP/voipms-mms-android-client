@@ -43,7 +43,7 @@ import net.kourlas.voipms_sms.sms.ConversationId
 import net.kourlas.voipms_sms.sms.Message
 import net.kourlas.voipms_sms.utils.httpPostWithMultipartFormData
 import net.kourlas.voipms_sms.utils.logException
-import net.kourlas.voipms_sms.utils.readCachedImageAsBase64
+import net.kourlas.voipms_sms.utils.readCachedMediaAsBase64
 import java.io.File
 import java.io.IOException
 
@@ -308,16 +308,13 @@ class SendMessageWorker(context: Context, params: WorkerParameters) :
 
     private suspend fun getMessageResponse(message: Message): MessageResponse? {
         try {
-            // Check if media1 is a local cache path (outgoing MMS)
-            // and convert it to base64 for the API call
-            val media1Base64 = if (message.media1.isNotEmpty()
-                && File(message.media1).exists()
-            ) {
-                readCachedImageAsBase64(message.media1)
-            } else {
-                null
-            }
-            val hasMedia = media1Base64 != null
+            // Collect media files for upload
+            val mediaFiles = listOf(
+                message.media1, message.media2, message.media3
+            ).filter { it.isNotEmpty() && File(it).exists() }
+                .map { File(it) }
+
+            val hasMedia = mediaFiles.isNotEmpty()
 
             val formData = mutableMapOf(
                 "api_username" to getEmail(applicationContext),
@@ -325,10 +322,17 @@ class SendMessageWorker(context: Context, params: WorkerParameters) :
                 "method" to if (hasMedia) "sendMMS" else "sendSMS",
                 "did" to message.did,
                 "dst" to message.contact,
-                "message" to message.text
+                "message" to message.text.ifEmpty {
+                    if (hasMedia) " " else ""
+                }
             )
-            if (hasMedia && media1Base64 != null) {
-                formData["media1"] = media1Base64
+
+            // Send media as data URI base64 per API docs
+            for ((i, file) in mediaFiles.withIndex()) {
+                val base64 = readCachedMediaAsBase64(file.absolutePath)
+                if (base64 != null) {
+                    formData["media${i + 1}"] = base64
+                }
             }
 
             repeat(3) {

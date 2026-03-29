@@ -20,6 +20,7 @@ package net.kourlas.voipms_sms.conversation
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Typeface
+import android.media.MediaPlayer
 import android.net.Uri
 import android.text.SpannableString
 import android.text.SpannableStringBuilder
@@ -31,10 +32,14 @@ import android.text.util.Linkify
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.MimeTypeMap
 import android.widget.Filter
 import android.widget.Filterable
+import android.widget.FrameLayout
+import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.QuickContactBadge
 import android.widget.TextView
 import coil3.load
@@ -48,8 +53,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.kourlas.voipms_sms.CustomApplication
+import net.kourlas.voipms_sms.preferences.getAutoDownloadContactsOnly
 import net.kourlas.voipms_sms.preferences.getAutoDownloadMmsImages
+import net.kourlas.voipms_sms.utils.getContactName
 import net.kourlas.voipms_sms.utils.HttpClientManager
+import net.kourlas.voipms_sms.utils.MediaType
+import net.kourlas.voipms_sms.utils.generateThumbnail
+import net.kourlas.voipms_sms.utils.getMediaExtension
+import net.kourlas.voipms_sms.utils.getMediaType
 import okhttp3.Request
 import java.io.File
 import kotlinx.coroutines.runBlocking
@@ -270,7 +281,11 @@ class ConversationRecyclerViewAdapter(
                 }
             }
 
-            if (message.medias.isNotEmpty()) {
+            // Show media URLs only for incoming messages (not local files)
+            val hasRemoteMedia = message.medias.any {
+                !File(it).exists() && it.isNotEmpty()
+            }
+            if (hasRemoteMedia) {
                 if (message.text != "") {
                     messageTextBuilder.append("\n\n")
                 }
@@ -307,33 +322,28 @@ class ConversationRecyclerViewAdapter(
             }
     }
 
-    /**
-     * Returns true if the given URL is a loadable VoIP.ms media image URL.
-     * Uses a strict regex to prevent path traversal attacks.
-     */
     private fun isLoadableMediaUrl(url: String): Boolean {
         return LOADABLE_MEDIA_URL_PATTERN.matches(url)
     }
 
-    /**
-     * Returns the local cache file for a given media URL.
-     */
     private fun getMediaCacheFile(mediaUrl: String): File {
+        val hash = mediaUrl.hashCode().toUInt().toString(16)
+        val ext = getMediaExtension(mediaUrl)
+        val cacheDir = File(activity.cacheDir, "media")
+        cacheDir.mkdirs()
+        return File(cacheDir, "$hash.$ext")
+    }
+
+    private fun getThumbnailCacheFile(mediaUrl: String): File {
         val hash = mediaUrl.hashCode().toUInt().toString(16)
         val cacheDir = File(activity.cacheDir, "media")
         cacheDir.mkdirs()
-        return File(cacheDir, "$hash.jpeg")
+        return File(cacheDir, "thumb_$hash.jpeg")
     }
 
-    /**
-     * Displays media content for the message. For loadable media URLs,
-     * shows the cached image if available, or a placeholder with a
-     * download icon otherwise. Tapping the placeholder downloads and
-     * caches the image. Tapping a loaded image opens it fullscreen.
-     *
-     * @param holder The message view holder to use.
-     * @param position The position of the view in the adapter.
-     */
+    // Active MediaPlayer instance for audio playback
+    private var activeMediaPlayer: MediaPlayer? = null
+
     private fun updateViewHolderMedia(
         holder: MessageViewHolder,
         position: Int
@@ -350,7 +360,6 @@ class ConversationRecyclerViewAdapter(
             return
         }
 
-        // Use 2/3 of screen width for media images
         val screenWidth = activity.resources.displayMetrics.widthPixels
         val mediaWidthPx = screenWidth * 2 / 3
         val marginBottomPx = activity.resources.getDimensionPixelSize(
@@ -358,7 +367,11 @@ class ConversationRecyclerViewAdapter(
         )
         val placeholderHeightPx = mediaWidthPx / 2
 
-        // Force container to expand to desired width; children use MATCH_PARENT
+        // Determine if auto-download is enabled for this contact
+        val shouldAutoDownload = getAutoDownloadMmsImages(activity)
+            && (!getAutoDownloadContactsOnly(activity)
+            || getContactName(activity, message.contact) != null)
+
         mediaContainer.minimumWidth = mediaWidthPx
 
         for (mediaUrl in mediaUrls) {
@@ -366,77 +379,35 @@ class ConversationRecyclerViewAdapter(
             val isLocalFile = localFile.exists()
 
             if (isLocalFile || isLoadableMediaUrl(mediaUrl)) {
-                // Image view for the loaded image
-                val imageView = ImageView(activity).apply {
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    ).apply {
-                        bottomMargin = marginBottomPx
-                    }
-                    adjustViewBounds = true
-                    scaleType = ImageView.ScaleType.FIT_START
-                    contentDescription = activity.getString(
-                        R.string.message_media
-                    )
-                }
+                val mediaType = getMediaType(
+                    if (isLocalFile) mediaUrl else getMediaExtension(mediaUrl)
+                )
 
                 if (isLocalFile) {
-                    // Local file (outgoing MMS): show thumbnail directly
-                    imageView.load(localFile) {
-                        size(Size(mediaWidthPx, mediaWidthPx))
-                    }
-                    imageView.setOnClickListener {
-                        launchImageViewer(localFile)
-                    }
-                    mediaContainer.addView(imageView)
+                    // --- OUTGOING: local file ---
+                    addLocalMediaView(
+                        mediaContainer, localFile, mediaType,
+                        mediaWidthPx, marginBottomPx
+                    )
                 } else {
+                    // --- INCOMING: remote URL ---
                     val cachedFile = getMediaCacheFile(mediaUrl)
 
-                    // Tap loaded image to open fullscreen in system viewer
-                    imageView.setOnClickListener {
-                        openImageInViewer(mediaUrl)
-                    }
-
                     if (cachedFile.exists()) {
-                        // Image already cached: show directly
-                        imageView.load(cachedFile) {
-                            size(Size(mediaWidthPx, mediaWidthPx))
-                        }
-                        mediaContainer.addView(imageView)
-                    } else if (getAutoDownloadMmsImages(activity)) {
-                        // Auto-download enabled: download immediately
-                        mediaContainer.addView(imageView)
-                        downloadAndShowImage(
-                            mediaUrl, cachedFile, imageView,
-                            null, mediaWidthPx
+                        addCachedMediaView(
+                            mediaContainer, cachedFile, mediaType,
+                            mediaWidthPx, marginBottomPx
+                        )
+                    } else if (shouldAutoDownload) {
+                        addAutoDownloadView(
+                            mediaContainer, mediaUrl, cachedFile, mediaType,
+                            mediaWidthPx, marginBottomPx, placeholderHeightPx
                         )
                     } else {
-                        // Manual mode: show placeholder, download on click
-                        imageView.visibility = View.GONE
-
-                        val placeholder = LayoutInflater.from(activity)
-                            .inflate(
-                                R.layout.media_placeholder,
-                                mediaContainer,
-                                false
-                            )
-                        placeholder.layoutParams = LinearLayout.LayoutParams(
-                            LinearLayout.LayoutParams.MATCH_PARENT,
-                            placeholderHeightPx
-                        ).apply {
-                            bottomMargin = marginBottomPx
-                        }
-
-                        placeholder.setOnClickListener {
-                            downloadAndShowImage(
-                                mediaUrl, cachedFile, imageView,
-                                placeholder, mediaWidthPx
-                            )
-                        }
-
-                        mediaContainer.addView(imageView)
-                        mediaContainer.addView(placeholder)
+                        addPlaceholderView(
+                            mediaContainer, mediaUrl, cachedFile, mediaType,
+                            mediaWidthPx, marginBottomPx, placeholderHeightPx
+                        )
                     }
                 }
             }
@@ -446,16 +417,197 @@ class ConversationRecyclerViewAdapter(
             if (mediaContainer.childCount > 0) View.VISIBLE else View.GONE
     }
 
-    /**
-     * Downloads an image, caches it locally, then displays it.
-     */
-    private fun downloadAndShowImage(
-        mediaUrl: String,
-        cachedFile: File,
-        imageView: ImageView,
-        placeholderContainer: View?,
-        mediaWidthPx: Int
+    /** Creates a video thumbnail with a play icon overlay. */
+    private fun addVideoView(
+        container: LinearLayout, file: File,
+        widthPx: Int, marginPx: Int, index: Int = -1
     ) {
+        val frame = FrameLayout(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = marginPx }
+        }
+        val iv = ImageView(activity).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+            )
+            adjustViewBounds = true
+            scaleType = ImageView.ScaleType.FIT_START
+        }
+        val thumbFile = getThumbnailCacheFile(file.absolutePath)
+        if (!thumbFile.exists()) {
+            generateThumbnail(file.absolutePath, thumbFile.absolutePath)
+        }
+        if (thumbFile.exists()) {
+            iv.load(thumbFile) { size(Size(widthPx, widthPx)) }
+        } else {
+            iv.setBackgroundColor(
+                ContextCompat.getColor(activity, android.R.color.darker_gray)
+            )
+            iv.minimumHeight = widthPx / 2
+        }
+        val playOverlay = ImageView(activity).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                128, 128, android.view.Gravity.CENTER
+            )
+            setImageResource(android.R.drawable.ic_media_play)
+            alpha = 0.8f
+        }
+        frame.addView(iv)
+        frame.addView(playOverlay)
+        frame.setOnClickListener { launchMediaViewer(file) }
+        if (index >= 0) container.addView(frame, index)
+        else container.addView(frame)
+    }
+
+    /** Adds a view for a locally cached outgoing media file. */
+    private fun addLocalMediaView(
+        container: LinearLayout, file: File, type: MediaType,
+        widthPx: Int, marginPx: Int
+    ) {
+        // Persist outgoing files to media cache for future access
+        val persistedFile = ensurePersistedCache(file)
+
+        when (type) {
+            MediaType.IMAGE, MediaType.GIF -> {
+                val iv = createMediaImageView(widthPx, marginPx)
+                iv.load(persistedFile) { size(Size(widthPx, widthPx)) }
+                iv.setOnClickListener { launchMediaViewer(persistedFile) }
+                container.addView(iv)
+            }
+            MediaType.AUDIO -> {
+                addAudioPlayerView(container, persistedFile, widthPx, marginPx)
+            }
+            MediaType.VIDEO -> {
+                addVideoView(container, persistedFile, widthPx, marginPx)
+            }
+            MediaType.OTHER -> {}
+        }
+    }
+
+    /** Copies outgoing file to persistent media cache if not already there. */
+    private fun ensurePersistedCache(file: File): File {
+        if (file.absolutePath.contains("/media/")) return file
+        val hash = file.absolutePath.hashCode().toUInt().toString(16)
+        val cacheDir = File(activity.cacheDir, "media")
+        cacheDir.mkdirs()
+        val persisted = File(cacheDir, "$hash.${file.extension}")
+        if (!persisted.exists()) {
+            file.copyTo(persisted, overwrite = true)
+        }
+        return persisted
+    }
+
+    /** Adds a view for a cached downloaded media file. */
+    private fun addCachedMediaView(
+        container: LinearLayout, file: File, type: MediaType,
+        widthPx: Int, marginPx: Int
+    ) {
+        when (type) {
+            MediaType.IMAGE, MediaType.GIF -> {
+                val iv = createMediaImageView(widthPx, marginPx)
+                iv.load(file) { size(Size(widthPx, widthPx)) }
+                iv.setOnClickListener { launchMediaViewer(file) }
+                container.addView(iv)
+            }
+            MediaType.AUDIO -> {
+                addAudioPlayerView(container, file, widthPx, marginPx)
+            }
+            MediaType.VIDEO -> {
+                addVideoView(container, file, widthPx, marginPx)
+            }
+            MediaType.OTHER -> {}
+        }
+    }
+
+    /** Shows placeholder, downloads on click, then shows media. */
+    private fun addPlaceholderView(
+        container: LinearLayout, mediaUrl: String, cachedFile: File,
+        type: MediaType, widthPx: Int, marginPx: Int, placeholderHeight: Int
+    ) {
+        val placeholder = LayoutInflater.from(activity)
+            .inflate(R.layout.media_placeholder, container, false)
+        placeholder.layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, placeholderHeight
+        ).apply { bottomMargin = marginPx }
+
+        // Set icon based on media type
+        val icon = placeholder.findViewById<ImageView>(android.R.id.icon)
+            ?: (placeholder as? ViewGroup)?.getChildAt(0) as? ImageView
+        when (type) {
+            MediaType.AUDIO -> icon?.setImageResource(
+                android.R.drawable.ic_lock_silent_mode_off
+            )
+            MediaType.VIDEO -> icon?.setImageResource(
+                android.R.drawable.ic_media_play
+            )
+            else -> icon?.setImageResource(
+                android.R.drawable.ic_menu_gallery
+            )
+        }
+
+        placeholder.setOnClickListener {
+            downloadMediaWithProgress(
+                container, placeholder, mediaUrl, cachedFile,
+                type, widthPx, marginPx
+            )
+        }
+
+        container.addView(placeholder)
+    }
+
+    /** Auto-downloads immediately with a progress indicator. */
+    private fun addAutoDownloadView(
+        container: LinearLayout, mediaUrl: String, cachedFile: File,
+        type: MediaType, widthPx: Int, marginPx: Int, placeholderHeight: Int
+    ) {
+        val progressView = LayoutInflater.from(activity)
+            .inflate(R.layout.media_downloading, container, false)
+        progressView.layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, placeholderHeight
+        ).apply { bottomMargin = marginPx }
+        container.addView(progressView)
+
+        downloadMediaWithProgressView(
+            container, progressView, mediaUrl, cachedFile,
+            type, widthPx, marginPx
+        )
+    }
+
+    /** Downloads media, shows circular progress, then replaces with media. */
+    private fun downloadMediaWithProgress(
+        container: LinearLayout, placeholder: View,
+        mediaUrl: String, cachedFile: File,
+        type: MediaType, widthPx: Int, marginPx: Int
+    ) {
+        // Replace placeholder with progress view (same size)
+        val idx = container.indexOfChild(placeholder)
+        val progressView = LayoutInflater.from(activity)
+            .inflate(R.layout.media_downloading, container, false)
+        progressView.layoutParams = placeholder.layoutParams
+        container.removeView(placeholder)
+        container.addView(progressView, idx)
+
+        downloadMediaWithProgressView(
+            container, progressView, mediaUrl, cachedFile,
+            type, widthPx, marginPx
+        )
+    }
+
+    private fun downloadMediaWithProgressView(
+        container: LinearLayout, progressView: View,
+        mediaUrl: String, cachedFile: File,
+        type: MediaType, widthPx: Int, marginPx: Int
+    ) {
+        val progressBar = progressView.findViewById<ProgressBar>(
+            R.id.download_progress
+        )
+        val progressText = progressView.findViewById<TextView>(
+            R.id.download_progress_text
+        )
+
         CustomApplication.getApplication().applicationScope.launch(
             Dispatchers.IO
         ) {
@@ -465,75 +617,268 @@ class ConversationRecyclerViewAdapter(
                     .newCall(request).execute()
                 if (!response.isSuccessful) return@launch
 
+                val totalBytes = response.body.contentLength()
+                var downloadedBytes = 0L
+
                 cachedFile.outputStream().use { output ->
                     response.body.byteStream().use { input ->
-                        input.copyTo(output)
+                        val buffer = ByteArray(8192)
+                        var bytesRead: Int
+                        while (input.read(buffer).also {
+                                bytesRead = it
+                            } != -1) {
+                            output.write(buffer, 0, bytesRead)
+                            downloadedBytes += bytesRead
+                            val progress = if (totalBytes > 0) {
+                                (downloadedBytes * 100 / totalBytes).toInt()
+                            } else 0
+                            val dlKB = downloadedBytes / 1024
+                            val totalKB = totalBytes / 1024
+                            withContext(Dispatchers.Main) {
+                                progressBar.progress = progress
+                                progressText.text = "$dlKB KB / $totalKB KB"
+                            }
+                        }
                     }
                 }
 
                 withContext(Dispatchers.Main) {
-                    placeholderContainer?.visibility = View.GONE
-                    imageView.visibility = View.VISIBLE
-                    imageView.load(cachedFile) {
-                        crossfade(true)
-                        size(Size(mediaWidthPx, mediaWidthPx))
+                    val idx = container.indexOfChild(progressView)
+                    container.removeView(progressView)
+                    when (type) {
+                        MediaType.IMAGE, MediaType.GIF -> {
+                            val iv = createMediaImageView(widthPx, marginPx)
+                            iv.load(cachedFile) {
+                                crossfade(true)
+                                size(Size(widthPx, widthPx))
+                            }
+                            iv.setOnClickListener {
+                                launchMediaViewer(cachedFile)
+                            }
+                            container.addView(iv, idx)
+                        }
+                        MediaType.AUDIO -> {
+                            addAudioPlayerView(
+                                container, cachedFile, widthPx, marginPx, idx
+                            )
+                        }
+                        MediaType.VIDEO -> {
+                            addVideoView(
+                                container, cachedFile,
+                                widthPx, marginPx, idx
+                            )
+                        }
+                        MediaType.OTHER -> {}
                     }
                 }
             } catch (_: Exception) {
-                // Keep placeholder visible on failure
+                // Keep progress view visible on failure
             }
         }
     }
 
-    /**
-     * Opens an image in the system image viewer via ACTION_VIEW,
-     * providing zoom, share, and save. Uses the cached file if
-     * available, otherwise downloads first.
-     */
-    private fun openImageInViewer(mediaUrl: String) {
-        val cachedFile = getMediaCacheFile(mediaUrl)
-        if (cachedFile.exists()) {
-            launchImageViewer(cachedFile)
-        } else {
-            CustomApplication.getApplication().applicationScope.launch(
-                Dispatchers.IO
-            ) {
-                try {
-                    val request = Request.Builder().url(mediaUrl).build()
-                    val response = HttpClientManager.getInstance().client
-                        .newCall(request).execute()
-                    if (!response.isSuccessful) return@launch
+    private fun createMediaImageView(
+        widthPx: Int, marginPx: Int
+    ): ImageView {
+        return ImageView(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = marginPx }
+            adjustViewBounds = true
+            scaleType = ImageView.ScaleType.FIT_START
+            contentDescription = activity.getString(R.string.message_media)
+        }
+    }
 
-                    cachedFile.outputStream().use { output ->
-                        response.body.byteStream().use { input ->
-                            input.copyTo(output)
-                        }
-                    }
+    private fun formatDuration(ms: Int): String {
+        val totalSec = ms / 1000
+        val min = totalSec / 60
+        val sec = totalSec % 60
+        return "%d:%02d".format(min, sec)
+    }
 
-                    withContext(Dispatchers.Main) {
-                        launchImageViewer(cachedFile)
+    private fun addAudioPlayerView(
+        container: LinearLayout, file: File,
+        widthPx: Int, marginPx: Int, index: Int = -1
+    ) {
+        val outerLayout = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = marginPx }
+            setBackgroundResource(R.drawable.media_placeholder_bg)
+            setPadding(24, 20, 24, 20)
+        }
+
+        val controlRow = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+
+        val playButton = ImageButton(activity).apply {
+            setImageResource(android.R.drawable.ic_media_play)
+            background = null
+            contentDescription = "Play"
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        val seekBar = android.widget.SeekBar(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
+            )
+            max = 100
+            progress = 0
+            setPadding(16, 0, 16, 0)
+        }
+
+        controlRow.addView(playButton)
+        controlRow.addView(seekBar)
+
+        val timeRow = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        val elapsedText = TextView(activity).apply {
+            text = "0:00"
+            setTextColor(
+                ContextCompat.getColor(activity, android.R.color.white)
+            )
+            textSize = 11f
+            layoutParams = LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
+            )
+            setPadding(48, 0, 0, 0)
+        }
+
+        val totalText = TextView(activity).apply {
+            text = "0:00"
+            setTextColor(
+                ContextCompat.getColor(activity, android.R.color.white)
+            )
+            textSize = 11f
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            setPadding(0, 0, 8, 0)
+        }
+
+        // Get total duration
+        try {
+            val mp = MediaPlayer().apply {
+                setDataSource(file.absolutePath)
+                prepare()
+            }
+            val durationMs = mp.duration
+            totalText.text = formatDuration(durationMs)
+            seekBar.max = durationMs
+            mp.release()
+        } catch (_: Exception) {
+            totalText.text = "--:--"
+        }
+
+        timeRow.addView(elapsedText)
+        timeRow.addView(totalText)
+
+        outerLayout.addView(controlRow)
+        outerLayout.addView(timeRow)
+
+        // Update handler for seekbar progress
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        val updateRunnable = object : Runnable {
+            override fun run() {
+                activeMediaPlayer?.let { mp ->
+                    if (mp.isPlaying) {
+                        seekBar.progress = mp.currentPosition
+                        elapsedText.text = formatDuration(mp.currentPosition)
+                        handler.postDelayed(this, 250)
                     }
-                } catch (_: Exception) {
-                    // Silently fail
                 }
             }
         }
+
+        seekBar.setOnSeekBarChangeListener(
+            object : android.widget.SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(
+                    sb: android.widget.SeekBar?, progress: Int,
+                    fromUser: Boolean
+                ) {
+                    if (fromUser) {
+                        activeMediaPlayer?.seekTo(progress)
+                        elapsedText.text = formatDuration(progress)
+                    }
+                }
+                override fun onStartTrackingTouch(sb: android.widget.SeekBar?) {}
+                override fun onStopTrackingTouch(sb: android.widget.SeekBar?) {}
+            }
+        )
+
+        playButton.setOnClickListener {
+            if (activeMediaPlayer?.isPlaying == true) {
+                activeMediaPlayer?.pause()
+                playButton.setImageResource(android.R.drawable.ic_media_play)
+                handler.removeCallbacks(updateRunnable)
+            } else {
+                activeMediaPlayer?.release()
+                activeMediaPlayer = MediaPlayer().apply {
+                    setDataSource(file.absolutePath)
+                    prepare()
+                    start()
+                }
+                seekBar.max = activeMediaPlayer!!.duration
+                playButton.setImageResource(android.R.drawable.ic_media_pause)
+                handler.post(updateRunnable)
+
+                activeMediaPlayer?.setOnCompletionListener {
+                    playButton.setImageResource(
+                        android.R.drawable.ic_media_play
+                    )
+                    seekBar.progress = 0
+                    elapsedText.text = "0:00"
+                    handler.removeCallbacks(updateRunnable)
+                    activeMediaPlayer?.release()
+                    activeMediaPlayer = null
+                }
+            }
+        }
+
+        if (index >= 0) {
+            container.addView(outerLayout, index)
+        } else {
+            container.addView(outerLayout)
+        }
     }
 
-    private fun launchImageViewer(file: File) {
+    private fun launchMediaViewer(file: File) {
         try {
+            val ext = file.extension.lowercase()
+            val mimeType = MimeTypeMap.getSingleton()
+                .getMimeTypeFromExtension(ext) ?: "application/octet-stream"
             val uri = FileProvider.getUriForFile(
                 activity,
                 "${activity.packageName}.fileprovider",
                 file
             )
             val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "image/jpeg")
+                setDataAndType(uri, mimeType)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             activity.startActivity(intent)
         } catch (_: Exception) {
-            // No image viewer available
+            // No viewer available
         }
     }
 
@@ -982,7 +1327,7 @@ class ConversationRecyclerViewAdapter(
     companion object {
         // Strict regex for VoIP.ms media URLs to prevent path traversal.
         private val LOADABLE_MEDIA_URL_PATTERN =
-            Regex("^https://voip\\.ms/media/[a-zA-Z0-9_=-]+/media\\.(jpeg|jpg|png|bmp|svg)$")
+            Regex("^https://voip\\.ms/media/[a-zA-Z0-9_=-]+/media\\.(jpeg|jpg|gif|png|mp3|wav|midi|mp4|3gp)$")
 
         // The number of additional items to retrieve when loadMoreItems is
         // called.

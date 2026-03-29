@@ -48,7 +48,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.view.ActionMode
@@ -90,8 +89,9 @@ import net.kourlas.voipms_sms.sms.Message
 import net.kourlas.voipms_sms.sms.workers.SendMessageWorker
 import net.kourlas.voipms_sms.ui.FastScroller
 import net.kourlas.voipms_sms.utils.JsonParserManager
-import net.kourlas.voipms_sms.utils.compressImageToCache
 import net.kourlas.voipms_sms.utils.abortActivity
+import net.kourlas.voipms_sms.utils.compressImageToCache
+import net.kourlas.voipms_sms.utils.getMediaExtension
 import net.kourlas.voipms_sms.utils.applyRoundedCornersMask
 import net.kourlas.voipms_sms.utils.getContactName
 import net.kourlas.voipms_sms.utils.getContactPhotoBitmap
@@ -102,6 +102,7 @@ import net.kourlas.voipms_sms.utils.safeUnregisterReceiver
 import net.kourlas.voipms_sms.utils.showAlertDialog
 import net.kourlas.voipms_sms.utils.showPermissionSnackbar
 import net.kourlas.voipms_sms.utils.showSnackbar
+import java.io.File
 import java.text.BreakIterator
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -119,16 +120,21 @@ open class ConversationActivity(val bubble: Boolean = false) :
     private lateinit var menu: Menu
     private var actionMode: ActionMode? = null
 
-    // Pending image attachment URI for MMS sending
-    private var pendingAttachmentUri: Uri? = null
+    // Pending attachment URIs for MMS sending (max 3)
+    private val pendingAttachmentUris = mutableListOf<Uri>()
 
-    // Photo picker launcher
+    // Supported MMS MIME types (images only — video not supported by API)
+    private val mmsMediaMimeTypes = arrayOf(
+        "image/jpeg", "image/png", "image/gif"
+    )
+
+    // File picker launcher for MMS attachments
     private val pickMedia = registerForActivityResult(
-        ActivityResultContracts.PickVisualMedia()
+        ActivityResultContracts.OpenDocument()
     ) { uri ->
-        if (uri != null) {
-            pendingAttachmentUri = uri
-            showAttachmentPreview(uri)
+        if (uri != null && pendingAttachmentUris.size < 3) {
+            pendingAttachmentUris.add(uri)
+            refreshAttachmentPreview()
         }
     }
 
@@ -602,47 +608,119 @@ open class ConversationActivity(val bubble: Boolean = false) :
     }
 
     /**
-     * Sets up the attach button to launch the photo picker.
+     * Sets up the attach button to launch the file picker.
      */
     private fun setupAttachButton() {
         val attachButton = findViewById<ImageButton>(R.id.attach_button)
         attachButton.setOnClickListener {
-            pickMedia.launch(
-                PickVisualMediaRequest(
-                    ActivityResultContracts.PickVisualMedia.ImageOnly
-                )
-            )
-        }
-
-        val removeButton = findViewById<ImageButton>(
-            R.id.attachment_remove_button
-        )
-        removeButton.setOnClickListener {
-            clearAttachment()
+            if (pendingAttachmentUris.size < 3) {
+                pickMedia.launch(mmsMediaMimeTypes)
+            }
         }
     }
 
     /**
-     * Shows a preview of the selected image attachment.
+     * Refreshes the attachment preview area to show all pending attachments.
      */
-    private fun showAttachmentPreview(uri: Uri) {
-        val previewSection = findViewById<FrameLayout>(
-            R.id.attachment_preview_section
+    private fun refreshAttachmentPreview() {
+        val previewContainer = findViewById<LinearLayout>(
+            R.id.attachment_preview_container
         )
-        val previewImage = findViewById<ImageView>(R.id.attachment_preview)
-        previewImage.setImageURI(uri)
-        previewSection.visibility = View.VISIBLE
+        previewContainer.removeAllViews()
+
+        if (pendingAttachmentUris.isEmpty()) {
+            previewContainer.visibility = View.GONE
+            return
+        }
+
+        previewContainer.visibility = View.VISIBLE
+
+        for ((index, uri) in pendingAttachmentUris.withIndex()) {
+            val slot = FrameLayout(this).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    resources.getDimensionPixelSize(R.dimen.quadruple_margin),
+                    resources.getDimensionPixelSize(R.dimen.quadruple_margin)
+                ).apply {
+                    marginEnd = resources.getDimensionPixelSize(
+                        R.dimen.half_margin
+                    )
+                }
+            }
+
+            val preview = ImageView(this).apply {
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+                scaleType = ImageView.ScaleType.CENTER_CROP
+            }
+
+            val mimeType = contentResolver.getType(uri) ?: ""
+            if (mimeType.startsWith("image/")) {
+                preview.setImageURI(uri)
+            } else if (mimeType.startsWith("audio/")) {
+                preview.setImageResource(R.drawable.ic_audio_file_24dp)
+            } else if (mimeType.startsWith("video/")) {
+                preview.setImageResource(R.drawable.ic_video_file_24dp)
+            } else {
+                preview.setImageResource(R.drawable.ic_attach_24dp)
+            }
+
+            val removeBtn = ImageButton(this).apply {
+                layoutParams = FrameLayout.LayoutParams(
+                    20.dpToPx(), 20.dpToPx()
+                ).apply { gravity = android.view.Gravity.TOP or android.view.Gravity.END }
+                setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
+                background = null
+                scaleType = ImageView.ScaleType.CENTER_INSIDE
+                val idx = index
+                setOnClickListener {
+                    if (idx < pendingAttachmentUris.size) {
+                        pendingAttachmentUris.removeAt(idx)
+                        refreshAttachmentPreview()
+                    }
+                }
+            }
+
+            slot.addView(preview)
+            slot.addView(removeBtn)
+            previewContainer.addView(slot)
+        }
     }
 
+    private fun Int.dpToPx(): Int =
+        (this * resources.displayMetrics.density).toInt()
+
     /**
-     * Clears the current image attachment.
+     * Clears all attachments.
      */
     private fun clearAttachment() {
-        pendingAttachmentUri = null
-        val previewSection = findViewById<FrameLayout>(
-            R.id.attachment_preview_section
+        pendingAttachmentUris.clear()
+        val previewContainer = findViewById<LinearLayout>(
+            R.id.attachment_preview_container
         )
-        previewSection.visibility = View.GONE
+        previewContainer.removeAllViews()
+        previewContainer.visibility = View.GONE
+    }
+
+    /**
+     * Deletes cached media files associated with a message.
+     */
+    private fun deleteMediaCache(message: Message) {
+        val mediaCacheDir = File(cacheDir, "media")
+        for (mediaUrl in message.medias) {
+            if (mediaUrl.startsWith("/")) {
+                // Outgoing: local file path
+                File(mediaUrl).delete()
+            } else {
+                // Incoming: cached from URL
+                val hash = mediaUrl.hashCode().toUInt().toString(16)
+                val ext = getMediaExtension(mediaUrl)
+                File(mediaCacheDir, "$hash.$ext").delete()
+                // Also delete thumbnail
+                File(mediaCacheDir, "thumb_$hash.jpeg").delete()
+            }
+        }
     }
 
     /**
@@ -674,10 +752,10 @@ open class ConversationActivity(val bubble: Boolean = false) :
         // Get message from UI
         val messageEditText = findViewById<EditText>(R.id.message_edit_text)
         val messageText = messageEditText.text.toString()
-        val attachmentUri = pendingAttachmentUri
+        val attachmentUris = pendingAttachmentUris.toList()
 
         val hasText = messageText.trim() != ""
-        val hasAttachment = attachmentUri != null
+        val hasAttachment = attachmentUris.isNotEmpty()
 
         if ((hasText || hasAttachment)
             && accountConfigured(applicationContext)
@@ -691,22 +769,20 @@ open class ConversationActivity(val bubble: Boolean = false) :
             CustomApplication.getApplication().applicationScope.launch(
                 Dispatchers.Default
             ) {
-                // Compress attachment to cache file if present
-                val cachedImagePath = if (attachmentUri != null) {
-                    compressImageToCache(applicationContext, attachmentUri)
-                        ?: ""
-                } else {
-                    ""
+                // Prepare attachments: compress images
+                val mediaPaths = attachmentUris.mapIndexedNotNull { i, uri ->
+                    compressImageToCache(applicationContext, uri, i)
                 }
+                val media1 = mediaPaths.getOrElse(0) { "" }
+                val media2 = mediaPaths.getOrElse(1) { "" }
+                val media3 = mediaPaths.getOrElse(2) { "" }
 
-                val ids = if (cachedImagePath.isNotEmpty()) {
-                    // MMS: single message with image, no text splitting
-                    // Store cache path in media1 (not the base64 data)
+                val ids = if (mediaPaths.isNotEmpty()) {
                     Database.getInstance(applicationContext)
                         .insertConversationMessagesDeliveryInProgress(
                             ConversationId(did, contact),
                             listOf(messageText),
-                            cachedImagePath
+                            media1, media2, media3
                         )
                 } else {
                     // SMS: split text if needed
@@ -1350,8 +1426,9 @@ open class ConversationActivity(val bubble: Boolean = false) :
         mode.finish()
 
         CustomApplication.getApplication().applicationScope.launch(Dispatchers.Default) {
-            // Delete each message.
+            // Delete each message and clean up cached media.
             for (message in messages) {
+                deleteMediaCache(message)
                 Database.getInstance(applicationContext)
                     .deleteMessage(
                         message.did, message.databaseId,

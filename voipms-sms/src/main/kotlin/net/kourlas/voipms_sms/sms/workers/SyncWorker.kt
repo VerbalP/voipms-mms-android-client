@@ -52,7 +52,11 @@ import net.kourlas.voipms_sms.preferences.getRetrieveDeletedMessages
 import net.kourlas.voipms_sms.preferences.getRetrieveOnlyRecentMessages
 import net.kourlas.voipms_sms.preferences.getStartDate
 import net.kourlas.voipms_sms.preferences.getSyncInterval
+import net.kourlas.voipms_sms.preferences.getAutoDownloadContactsOnly
+import net.kourlas.voipms_sms.preferences.getAutoDownloadMmsImages
 import net.kourlas.voipms_sms.sms.ConversationId
+import net.kourlas.voipms_sms.utils.downloadMediaToCache
+import net.kourlas.voipms_sms.utils.getContactName
 import net.kourlas.voipms_sms.utils.httpPostWithMultipartFormData
 import net.kourlas.voipms_sms.utils.logException
 import net.kourlas.voipms_sms.utils.normalizeVoipMsPhoneNumber
@@ -353,6 +357,26 @@ class SyncWorker(context: Context, params: WorkerParameters) :
                 R.string.sync_error_database
             )
             return@coroutineScope
+        }
+
+        // Pre-download MMS images if auto-download is enabled,
+        // so they can be shown in notifications
+        if (newConversationIds.isNotEmpty()
+            && getAutoDownloadMmsImages(applicationContext)
+        ) {
+            val contactsOnly = getAutoDownloadContactsOnly(
+                applicationContext
+            )
+            for (msg in incomingMessages) {
+                if (!msg.isIncoming) continue
+                if (contactsOnly && getContactName(
+                        applicationContext, msg.contact
+                    ) == null
+                ) continue
+                listOfNotNull(msg.media1, msg.media2, msg.media3)
+                    .filter { it.isNotEmpty() }
+                    .forEach { downloadMediaToCache(applicationContext, it) }
+            }
         }
 
         // Show notifications for new messages

@@ -45,4 +45,11 @@
         android:key="@string/preferences_sync_auto_download_mms_images_key"
         android:summary="@string/preferences_sync_auto_download_mms_images_summary"
         android:title="@string/preferences_sync_auto_download_mms_images_title" />
+    <androidx.preference.SwitchPreference
+        android:defaultValue="@string/preferences_sync_auto_download_contacts_only_default_value"
+        android:dependency="@string/preferences_sync_auto_download_mms_images_key"
+        android:icon="@android:color/transparent"
+        android:key="@string/preferences_sync_auto_download_contacts_only_key"
+        android:summary="@string/preferences_sync_auto_download_contacts_only_summary"
+        android:title="@string/preferences_sync_auto_download_contacts_only_title" />
 </androidx.preference.PreferenceScreen>

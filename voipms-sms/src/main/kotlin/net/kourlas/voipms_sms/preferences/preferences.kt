@@ -226,6 +226,19 @@ fun getAutoDownloadMmsImages(context: Context): Boolean {
     )
 }
 
+fun getAutoDownloadContactsOnly(context: Context): Boolean {
+    val value: String = context.getString(
+        R.string.preferences_sync_auto_download_contacts_only_default_value
+    )
+    return getBooleanPreference(
+        context,
+        context.getString(
+            R.string.preferences_sync_auto_download_contacts_only_key
+        ),
+        value.toBoolean()
+    )
+}
+
 fun getRetrieveOnlyRecentMessages(context: Context): Boolean {
     val value: String = context.getString(
         R.string.preferences_sync_retrieve_only_recent_messages_default_value

@@ -22,8 +22,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.kourlas.voipms_sms.preferences.getConnectTimeout
 import net.kourlas.voipms_sms.preferences.getReadTimeout
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.asRequestBody
+import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
@@ -31,15 +34,32 @@ import java.util.concurrent.TimeUnit
  * Sends a POST request with a multipart/form-data encoded request body to the
  * specified URL, and retrieves a JSON response body.
  */
+/**
+ * Represents a file to upload as a multipart form part.
+ */
+data class FileUpload(
+    val fieldName: String,
+    val file: File,
+    val mimeType: String
+)
+
 @Suppress("SameParameterValue")
 suspend inline fun <reified T> httpPostWithMultipartFormData(
     context: Context, url: String,
-    formData: Map<String, String> = emptyMap()
+    formData: Map<String, String> = emptyMap(),
+    fileUploads: List<FileUpload> = emptyList()
 ): T? {
     val requestBodyBuilder = MultipartBody.Builder()
     requestBodyBuilder.setType(MultipartBody.FORM)
     for ((key, value) in formData) {
         requestBodyBuilder.addFormDataPart(key, value)
+    }
+    for (upload in fileUploads) {
+        val mediaType = upload.mimeType.toMediaType()
+        val fileBody = upload.file.asRequestBody(mediaType)
+        requestBodyBuilder.addFormDataPart(
+            upload.fieldName, upload.file.name, fileBody
+        )
     }
     val requestBody = requestBodyBuilder.build()
 

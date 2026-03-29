@@ -24,6 +24,7 @@ import android.os.Build
 import androidx.appcompat.app.AppCompatDelegate
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
+import coil3.gif.AnimatedImageDecoder
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -150,6 +151,7 @@ class CustomApplication : Application(), SingletonImageLoader.Factory {
     override fun newImageLoader(context: Context): ImageLoader {
         return ImageLoader.Builder(context)
             .components {
+                add(AnimatedImageDecoder.Factory())
                 add(
                     OkHttpNetworkFetcherFactory(
                         callFactory = { HttpClientManager.getInstance().client }

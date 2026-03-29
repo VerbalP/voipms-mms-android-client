@@ -409,7 +409,9 @@ class Database private constructor(private val context: Context) {
     suspend fun insertConversationMessagesDeliveryInProgress(
         conversationId: ConversationId,
         texts: List<String>,
-        media1: String = ""
+        media1: String = "",
+        media2: String = "",
+        media3: String = ""
     ): List<Long> = coroutineScope {
         val messages = importExportLock.read {
             val smses = texts.map {
@@ -418,6 +420,8 @@ class Database private constructor(private val context: Context) {
                     contact = conversationId.contact,
                     text = it,
                     media1 = media1,
+                    media2 = media2,
+                    media3 = media3,
                     deliveryInProgress = 1
                 )
             }

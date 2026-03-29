@@ -2,14 +2,15 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/darker_gray"
+    android:background="@drawable/media_placeholder_bg"
     android:clickable="true"
     android:focusable="true">
 
     <ImageView
+        android:id="@android:id/icon"
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:layout_gravity="center"
         android:contentDescription="@string/conversation_media_download"
-        android:src="@drawable/ic_download_24dp" />
+        android:src="@android:drawable/ic_menu_gallery" />
 </FrameLayout>

@@ -82,36 +82,15 @@
             android:background="@color/message_section"
             android:orientation="vertical">
 
-            <FrameLayout
-                android:id="@+id/attachment_preview_section"
+            <LinearLayout
+                android:id="@+id/attachment_preview_container"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="end"
                 android:layout_marginTop="@dimen/half_margin"
                 android:layout_marginEnd="@dimen/half_margin"
-                android:visibility="gone">
-
-                <ImageView
-                    android:id="@+id/attachment_preview"
-                    android:layout_width="80dp"
-                    android:layout_height="80dp"
-                    android:layout_marginTop="4dp"
-                    android:layout_marginEnd="4dp"
-                    android:contentDescription="@string/message_media"
-                    android:scaleType="centerCrop" />
-
-                <ImageButton
-                    android:id="@+id/attachment_remove_button"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:layout_gravity="top|end"
-                    android:background="@drawable/conversation_button_send"
-                    android:contentDescription="@string/conversation_action_delete"
-                    android:padding="4dp"
-                    android:scaleType="centerInside"
-                    app:srcCompat="@drawable/ic_close_toolbar_24dp"
-                    app:tint="@android:color/white" />
-            </FrameLayout>
+                android:orientation="horizontal"
+                android:visibility="gone" />
 
             <LinearLayout
                 android:layout_width="match_parent"
