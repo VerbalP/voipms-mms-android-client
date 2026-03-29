@@ -18,9 +18,13 @@
 package net.kourlas.voipms_sms
 
 import android.app.Application
+import android.content.Context
 import android.net.ConnectivityManager
 import android.os.Build
 import androidx.appcompat.app.AppCompatDelegate
+import coil3.ImageLoader
+import coil3.SingletonImageLoader
+import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -34,9 +38,10 @@ import net.kourlas.voipms_sms.preferences.migrateLegacySecurePreferences
 import net.kourlas.voipms_sms.preferences.setRawSyncInterval
 import net.kourlas.voipms_sms.sms.ConversationId
 import net.kourlas.voipms_sms.sms.workers.SyncWorker
+import net.kourlas.voipms_sms.utils.HttpClientManager
 import net.kourlas.voipms_sms.utils.subscribeToDidTopics
 
-class CustomApplication : Application() {
+class CustomApplication : Application(), SingletonImageLoader.Factory {
     private var conversationsActivitiesVisible = 0
     private val conversationActivitiesVisible: MutableMap<ConversationId, Int> =
         HashMap()
@@ -140,6 +145,18 @@ class CustomApplication : Application() {
             Database.getInstance(applicationContext)
                 .markAllDeliveryInProgressMessagesAsNotSent()
         }
+    }
+
+    override fun newImageLoader(context: Context): ImageLoader {
+        return ImageLoader.Builder(context)
+            .components {
+                add(
+                    OkHttpNetworkFetcherFactory(
+                        callFactory = { HttpClientManager.getInstance().client }
+                    )
+                )
+            }
+            .build()
     }
 
     companion object {

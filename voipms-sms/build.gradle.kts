@@ -131,6 +131,8 @@ dependencies {
     // Other third-party libraries
     implementation(libs.moshi.adapters)
     implementation(libs.moshi)
+    implementation(libs.coil)
+    implementation(libs.coil.network.okhttp)
     implementation(libs.okhttp)
     implementation(libs.mukeshsolanki.markdownView)
     implementation(libs.xabaras.recyclerViewSwipeDecorator)

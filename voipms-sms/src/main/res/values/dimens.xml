@@ -27,6 +27,10 @@
     <dimen name="adaptive_icon_drawable_outer">108dp</dimen>
     <dimen name="adaptive_icon_drawable_inner">72dp</dimen>
     <dimen name="send_message_elevation">4dp</dimen>
+
+    <!-- MMS media -->
+    <dimen name="media_image_max_width">250dp</dimen>
+    <dimen name="media_image_margin_bottom">4dp</dimen>
     <dimen name="toolbar_left_margin">72dp</dimen>
 
     <!-- Fast scroller -->

@@ -62,6 +62,10 @@
     <string name="preferences_sync_retrieve_deleted_messages_title">Retrieve deleted messages</string>
     <string name="preferences_sync_retrieve_deleted_messages_summary">Retrieve messages from VoIP.ms that were deleted locally</string>
     <string name="preferences_sync_retrieve_deleted_messages_default_value" translatable="false">false</string>
+    <string name="preferences_sync_auto_download_mms_images_key" translatable="false">sync_auto_download_mms_images</string>
+    <string name="preferences_sync_auto_download_mms_images_title">Auto-download MMS images</string>
+    <string name="preferences_sync_auto_download_mms_images_summary">Download and save images received via MMS automatically (without click on the download button)</string>
+    <string name="preferences_sync_auto_download_mms_images_default_value" translatable="false">false</string>
 
     <!-- Notifications -->
     <string name="preferences_notifications_category_name">Notifications</string>
@@ -179,6 +183,7 @@
     <string name="conversation_info_title">Message details</string>
     <string name="conversation_info_to">To: %1$s</string>
     <string name="conversation_info_media">Media: %1$s</string>
+    <string name="conversation_media_download">Download</string>
     <string name="conversation_message_clipboard_description">Text message</string>
     <string name="conversation_message_not_sent">Not sent. Touch to try again.</string>
     <string name="conversation_message_sending">Sending…</string>

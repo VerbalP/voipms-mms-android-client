@@ -213,6 +213,19 @@ fun getRetrieveDeletedMessages(context: Context): Boolean {
     )
 }
 
+fun getAutoDownloadMmsImages(context: Context): Boolean {
+    val value: String = context.getString(
+        R.string.preferences_sync_auto_download_mms_images_default_value
+    )
+    return getBooleanPreference(
+        context,
+        context.getString(
+            R.string.preferences_sync_auto_download_mms_images_key
+        ),
+        value.toBoolean()
+    )
+}
+
 fun getRetrieveOnlyRecentMessages(context: Context): Boolean {
     val value: String = context.getString(
         R.string.preferences_sync_retrieve_only_recent_messages_default_value

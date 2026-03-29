@@ -17,8 +17,10 @@
 
 package net.kourlas.voipms_sms.conversation
 
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Typeface
+import android.net.Uri
 import android.text.SpannableString
 import android.text.SpannableStringBuilder
 import android.text.Spanned
@@ -31,11 +33,25 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Filter
 import android.widget.Filterable
+import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.QuickContactBadge
 import android.widget.TextView
+import coil3.load
+import coil3.request.crossfade
+import coil3.size.Size
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import net.kourlas.voipms_sms.CustomApplication
+import net.kourlas.voipms_sms.preferences.getAutoDownloadMmsImages
+import net.kourlas.voipms_sms.utils.HttpClientManager
+import okhttp3.Request
+import java.io.File
 import kotlinx.coroutines.runBlocking
 import me.saket.bettermovementmethod.BetterLinkMovementMethod
 import net.kourlas.voipms_sms.BuildConfig
@@ -129,6 +145,7 @@ class ConversationRecyclerViewAdapter(
         // Set up view to match message at position
         updateViewHolderViewHeight(holder, position)
         updateViewHolderContactBadge(holder, position)
+        updateViewHolderMedia(holder, position)
         updateViewHolderMessageText(holder, position)
         updateViewHolderDateText(holder, position)
         updateViewHolderColours(holder, position)
@@ -288,6 +305,222 @@ class ConversationRecyclerViewAdapter(
                     true
                 }
             }
+    }
+
+    /**
+     * Returns true if the given URL is a loadable VoIP.ms media image URL.
+     * Uses a strict regex to prevent path traversal attacks.
+     */
+    private fun isLoadableMediaUrl(url: String): Boolean {
+        return LOADABLE_MEDIA_URL_PATTERN.matches(url)
+    }
+
+    /**
+     * Returns the local cache file for a given media URL.
+     */
+    private fun getMediaCacheFile(mediaUrl: String): File {
+        val hash = mediaUrl.hashCode().toUInt().toString(16)
+        val cacheDir = File(activity.cacheDir, "media")
+        cacheDir.mkdirs()
+        return File(cacheDir, "$hash.jpeg")
+    }
+
+    /**
+     * Displays media content for the message. For loadable media URLs,
+     * shows the cached image if available, or a placeholder with a
+     * download icon otherwise. Tapping the placeholder downloads and
+     * caches the image. Tapping a loaded image opens it fullscreen.
+     *
+     * @param holder The message view holder to use.
+     * @param position The position of the view in the adapter.
+     */
+    private fun updateViewHolderMedia(
+        holder: MessageViewHolder,
+        position: Int
+    ) {
+        val message = messageItems[position].message
+        val mediaContainer = holder.mediaContainer
+
+        mediaContainer.removeAllViews()
+
+        val mediaUrls = message.medias
+        if (mediaUrls.isEmpty()) {
+            mediaContainer.visibility = View.GONE
+            mediaContainer.minimumWidth = 0
+            return
+        }
+
+        // Use 2/3 of screen width for media images
+        val screenWidth = activity.resources.displayMetrics.widthPixels
+        val mediaWidthPx = screenWidth * 2 / 3
+        val marginBottomPx = activity.resources.getDimensionPixelSize(
+            R.dimen.media_image_margin_bottom
+        )
+        val placeholderHeightPx = mediaWidthPx / 2
+
+        // Force container to expand to desired width; children use MATCH_PARENT
+        mediaContainer.minimumWidth = mediaWidthPx
+
+        for (mediaUrl in mediaUrls) {
+            if (isLoadableMediaUrl(mediaUrl)) {
+                val cachedFile = getMediaCacheFile(mediaUrl)
+
+                // Image view for the loaded image
+                val imageView = ImageView(activity).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        bottomMargin = marginBottomPx
+                    }
+                    adjustViewBounds = true
+                    scaleType = ImageView.ScaleType.FIT_START
+                    contentDescription = activity.getString(
+                        R.string.message_media
+                    )
+                }
+
+                // Tap loaded image to open fullscreen in system viewer
+                imageView.setOnClickListener {
+                    openImageInViewer(mediaUrl)
+                }
+
+                if (cachedFile.exists()) {
+                    // Image already cached: show directly
+                    imageView.load(cachedFile) {
+                        size(Size(mediaWidthPx, mediaWidthPx))
+                    }
+                    mediaContainer.addView(imageView)
+                } else if (getAutoDownloadMmsImages(activity)) {
+                    // Auto-download enabled: download immediately
+                    mediaContainer.addView(imageView)
+                    downloadAndShowImage(
+                        mediaUrl, cachedFile, imageView,
+                        null, mediaWidthPx
+                    )
+                } else {
+                    // Manual mode: show placeholder, download on click
+                    imageView.visibility = View.GONE
+
+                    val placeholder = LayoutInflater.from(activity)
+                        .inflate(
+                            R.layout.media_placeholder,
+                            mediaContainer,
+                            false
+                        )
+                    placeholder.layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        placeholderHeightPx
+                    ).apply {
+                        bottomMargin = marginBottomPx
+                    }
+
+                    placeholder.setOnClickListener {
+                        downloadAndShowImage(
+                            mediaUrl, cachedFile, imageView,
+                            placeholder, mediaWidthPx
+                        )
+                    }
+
+                    mediaContainer.addView(imageView)
+                    mediaContainer.addView(placeholder)
+                }
+            }
+        }
+
+        mediaContainer.visibility =
+            if (mediaContainer.childCount > 0) View.VISIBLE else View.GONE
+    }
+
+    /**
+     * Downloads an image, caches it locally, then displays it.
+     */
+    private fun downloadAndShowImage(
+        mediaUrl: String,
+        cachedFile: File,
+        imageView: ImageView,
+        placeholderContainer: View?,
+        mediaWidthPx: Int
+    ) {
+        CustomApplication.getApplication().applicationScope.launch(
+            Dispatchers.IO
+        ) {
+            try {
+                val request = Request.Builder().url(mediaUrl).build()
+                val response = HttpClientManager.getInstance().client
+                    .newCall(request).execute()
+                if (!response.isSuccessful) return@launch
+
+                cachedFile.outputStream().use { output ->
+                    response.body.byteStream().use { input ->
+                        input.copyTo(output)
+                    }
+                }
+
+                withContext(Dispatchers.Main) {
+                    placeholderContainer?.visibility = View.GONE
+                    imageView.visibility = View.VISIBLE
+                    imageView.load(cachedFile) {
+                        crossfade(true)
+                        size(Size(mediaWidthPx, mediaWidthPx))
+                    }
+                }
+            } catch (_: Exception) {
+                // Keep placeholder visible on failure
+            }
+        }
+    }
+
+    /**
+     * Opens an image in the system image viewer via ACTION_VIEW,
+     * providing zoom, share, and save. Uses the cached file if
+     * available, otherwise downloads first.
+     */
+    private fun openImageInViewer(mediaUrl: String) {
+        val cachedFile = getMediaCacheFile(mediaUrl)
+        if (cachedFile.exists()) {
+            launchImageViewer(cachedFile)
+        } else {
+            CustomApplication.getApplication().applicationScope.launch(
+                Dispatchers.IO
+            ) {
+                try {
+                    val request = Request.Builder().url(mediaUrl).build()
+                    val response = HttpClientManager.getInstance().client
+                        .newCall(request).execute()
+                    if (!response.isSuccessful) return@launch
+
+                    cachedFile.outputStream().use { output ->
+                        response.body.byteStream().use { input ->
+                            input.copyTo(output)
+                        }
+                    }
+
+                    withContext(Dispatchers.Main) {
+                        launchImageViewer(cachedFile)
+                    }
+                } catch (_: Exception) {
+                    // Silently fail
+                }
+            }
+        }
+    }
+
+    private fun launchImageViewer(file: File) {
+        try {
+            val uri = FileProvider.getUriForFile(
+                activity,
+                "${activity.packageName}.fileprovider",
+                file
+            )
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "image/jpeg")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            activity.startActivity(intent)
+        } catch (_: Exception) {
+            // No image viewer available
+        }
     }
 
     /**
@@ -707,6 +940,8 @@ class ConversationRecyclerViewAdapter(
             }
         internal val smsContainer: View =
             itemView.findViewById(R.id.sms_container)
+        internal val mediaContainer: LinearLayout =
+            itemView.findViewById(R.id.media_container)
         internal val messageText: TextView =
             itemView.findViewById(R.id.message)
         internal val dateText: TextView =
@@ -731,6 +966,10 @@ class ConversationRecyclerViewAdapter(
     }
 
     companion object {
+        // Strict regex for VoIP.ms media URLs to prevent path traversal.
+        private val LOADABLE_MEDIA_URL_PATTERN =
+            Regex("^https://voip\\.ms/media/[a-zA-Z0-9_=-]+/media\\.jpeg$")
+
         // The number of additional items to retrieve when loadMoreItems is
         // called.
         private const val ADDITIONAL_ITEMS_INCREMENT = 100L

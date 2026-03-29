@@ -3,6 +3,7 @@ agp = "9.0.1"
 annotation = "1.9.1"
 appcompat = "1.7.1"
 betterLinkMovementMethod = "2.2.0"
+coil = "3.1.0"
 composeUi = "1.10.4"
 coreKtx = "1.17.0"
 firebaseBom = "34.10.0"
@@ -51,6 +52,8 @@ moshi = { module = "com.squareup.moshi:moshi", version.ref = "moshiVersion" }
 moshi-adapters = { module = "com.squareup.moshi:moshi-adapters", version.ref = "moshiVersion" }
 moshi-kotlin-codegen = { module = "com.squareup.moshi:moshi-kotlin-codegen", version.ref = "moshiVersion" }
 mukeshsolanki-markdownView = { module = "com.github.mukeshsolanki:MarkdownView-Android", version.ref = "markdownviewAndroid" }
+coil = { module = "io.coil-kt.coil3:coil", version.ref = "coil" }
+coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 saket-betterLinkMovementMethod = { module = "me.saket:better-link-movement-method", version.ref = "betterLinkMovementMethod" }
 xabaras-recyclerViewSwipeDecorator = { module = "com.github.xabaras:RecyclerViewSwipeDecorator", version.ref = "recyclerviewswipedecorator" }
