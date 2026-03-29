@@ -362,9 +362,10 @@ class ConversationRecyclerViewAdapter(
         mediaContainer.minimumWidth = mediaWidthPx
 
         for (mediaUrl in mediaUrls) {
-            if (isLoadableMediaUrl(mediaUrl)) {
-                val cachedFile = getMediaCacheFile(mediaUrl)
+            val localFile = File(mediaUrl)
+            val isLocalFile = localFile.exists()
 
+            if (isLocalFile || isLoadableMediaUrl(mediaUrl)) {
                 // Image view for the loaded image
                 val imageView = ImageView(activity).apply {
                     layoutParams = LinearLayout.LayoutParams(
@@ -380,50 +381,63 @@ class ConversationRecyclerViewAdapter(
                     )
                 }
 
-                // Tap loaded image to open fullscreen in system viewer
-                imageView.setOnClickListener {
-                    openImageInViewer(mediaUrl)
-                }
-
-                if (cachedFile.exists()) {
-                    // Image already cached: show directly
-                    imageView.load(cachedFile) {
+                if (isLocalFile) {
+                    // Local file (outgoing MMS): show thumbnail directly
+                    imageView.load(localFile) {
                         size(Size(mediaWidthPx, mediaWidthPx))
                     }
+                    imageView.setOnClickListener {
+                        launchImageViewer(localFile)
+                    }
                     mediaContainer.addView(imageView)
-                } else if (getAutoDownloadMmsImages(activity)) {
-                    // Auto-download enabled: download immediately
-                    mediaContainer.addView(imageView)
-                    downloadAndShowImage(
-                        mediaUrl, cachedFile, imageView,
-                        null, mediaWidthPx
-                    )
                 } else {
-                    // Manual mode: show placeholder, download on click
-                    imageView.visibility = View.GONE
+                    val cachedFile = getMediaCacheFile(mediaUrl)
 
-                    val placeholder = LayoutInflater.from(activity)
-                        .inflate(
-                            R.layout.media_placeholder,
-                            mediaContainer,
-                            false
-                        )
-                    placeholder.layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        placeholderHeightPx
-                    ).apply {
-                        bottomMargin = marginBottomPx
+                    // Tap loaded image to open fullscreen in system viewer
+                    imageView.setOnClickListener {
+                        openImageInViewer(mediaUrl)
                     }
 
-                    placeholder.setOnClickListener {
+                    if (cachedFile.exists()) {
+                        // Image already cached: show directly
+                        imageView.load(cachedFile) {
+                            size(Size(mediaWidthPx, mediaWidthPx))
+                        }
+                        mediaContainer.addView(imageView)
+                    } else if (getAutoDownloadMmsImages(activity)) {
+                        // Auto-download enabled: download immediately
+                        mediaContainer.addView(imageView)
                         downloadAndShowImage(
                             mediaUrl, cachedFile, imageView,
-                            placeholder, mediaWidthPx
+                            null, mediaWidthPx
                         )
-                    }
+                    } else {
+                        // Manual mode: show placeholder, download on click
+                        imageView.visibility = View.GONE
 
-                    mediaContainer.addView(imageView)
-                    mediaContainer.addView(placeholder)
+                        val placeholder = LayoutInflater.from(activity)
+                            .inflate(
+                                R.layout.media_placeholder,
+                                mediaContainer,
+                                false
+                            )
+                        placeholder.layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            placeholderHeightPx
+                        ).apply {
+                            bottomMargin = marginBottomPx
+                        }
+
+                        placeholder.setOnClickListener {
+                            downloadAndShowImage(
+                                mediaUrl, cachedFile, imageView,
+                                placeholder, mediaWidthPx
+                            )
+                        }
+
+                        mediaContainer.addView(imageView)
+                        mediaContainer.addView(placeholder)
+                    }
                 }
             }
         }
@@ -968,7 +982,7 @@ class ConversationRecyclerViewAdapter(
     companion object {
         // Strict regex for VoIP.ms media URLs to prevent path traversal.
         private val LOADABLE_MEDIA_URL_PATTERN =
-            Regex("^https://voip\\.ms/media/[a-zA-Z0-9_=-]+/media\\.jpeg$")
+            Regex("^https://voip\\.ms/media/[a-zA-Z0-9_=-]+/media\\.(jpeg|jpg|png|bmp|svg)$")
 
         // The number of additional items to retrieve when loadMoreItems is
         // called.

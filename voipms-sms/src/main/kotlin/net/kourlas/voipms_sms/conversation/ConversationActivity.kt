@@ -28,6 +28,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -42,10 +43,13 @@ import android.view.ViewGroup.MarginLayoutParams
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.view.ActionMode
 import androidx.appcompat.widget.SearchView
@@ -86,6 +90,7 @@ import net.kourlas.voipms_sms.sms.Message
 import net.kourlas.voipms_sms.sms.workers.SendMessageWorker
 import net.kourlas.voipms_sms.ui.FastScroller
 import net.kourlas.voipms_sms.utils.JsonParserManager
+import net.kourlas.voipms_sms.utils.compressImageToCache
 import net.kourlas.voipms_sms.utils.abortActivity
 import net.kourlas.voipms_sms.utils.applyRoundedCornersMask
 import net.kourlas.voipms_sms.utils.getContactName
@@ -113,6 +118,19 @@ open class ConversationActivity(val bubble: Boolean = false) :
     private lateinit var layoutManager: LinearLayoutManager
     private lateinit var menu: Menu
     private var actionMode: ActionMode? = null
+
+    // Pending image attachment URI for MMS sending
+    private var pendingAttachmentUri: Uri? = null
+
+    // Photo picker launcher
+    private val pickMedia = registerForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            pendingAttachmentUri = uri
+            showAttachmentPreview(uri)
+        }
+    }
 
     // The DID and contact associated with this conversation
     private lateinit var did: String
@@ -195,6 +213,7 @@ open class ConversationActivity(val bubble: Boolean = false) :
         setupRecyclerView()
         setupMessageText()
         getMessageTextFromIntent()
+        setupAttachButton()
         setupSendButton()
         setupDemo()
 
@@ -583,6 +602,50 @@ open class ConversationActivity(val bubble: Boolean = false) :
     }
 
     /**
+     * Sets up the attach button to launch the photo picker.
+     */
+    private fun setupAttachButton() {
+        val attachButton = findViewById<ImageButton>(R.id.attach_button)
+        attachButton.setOnClickListener {
+            pickMedia.launch(
+                PickVisualMediaRequest(
+                    ActivityResultContracts.PickVisualMedia.ImageOnly
+                )
+            )
+        }
+
+        val removeButton = findViewById<ImageButton>(
+            R.id.attachment_remove_button
+        )
+        removeButton.setOnClickListener {
+            clearAttachment()
+        }
+    }
+
+    /**
+     * Shows a preview of the selected image attachment.
+     */
+    private fun showAttachmentPreview(uri: Uri) {
+        val previewSection = findViewById<FrameLayout>(
+            R.id.attachment_preview_section
+        )
+        val previewImage = findViewById<ImageView>(R.id.attachment_preview)
+        previewImage.setImageURI(uri)
+        previewSection.visibility = View.VISIBLE
+    }
+
+    /**
+     * Clears the current image attachment.
+     */
+    private fun clearAttachment() {
+        pendingAttachmentUri = null
+        val previewSection = findViewById<FrameLayout>(
+            R.id.attachment_preview_section
+        )
+        previewSection.visibility = View.GONE
+    }
+
+    /**
      * Sets up the activity send button.
      */
     private fun setupSendButton() {
@@ -611,28 +674,48 @@ open class ConversationActivity(val bubble: Boolean = false) :
         // Get message from UI
         val messageEditText = findViewById<EditText>(R.id.message_edit_text)
         val messageText = messageEditText.text.toString()
+        val attachmentUri = pendingAttachmentUri
 
-        if (messageText.trim() != ""
+        val hasText = messageText.trim() != ""
+        val hasAttachment = attachmentUri != null
+
+        if ((hasText || hasAttachment)
             && accountConfigured(applicationContext)
             && did in getDids(applicationContext)
         ) {
-            // Clear the message text box.
+            // Clear the message text box and attachment.
             messageEditText.setText("")
+            clearAttachment()
 
             // Send the message using the SendMessageService.
             CustomApplication.getApplication().applicationScope.launch(
                 Dispatchers.Default
             ) {
-                val ids = Database.getInstance(
-                    applicationContext
-                )
-                    .insertConversationMessagesDeliveryInProgress(
-                        ConversationId(
-                            did,
-                            contact
-                        ),
-                        getMessageTexts(applicationContext, messageText)
-                    )
+                // Compress attachment to cache file if present
+                val cachedImagePath = if (attachmentUri != null) {
+                    compressImageToCache(applicationContext, attachmentUri)
+                        ?: ""
+                } else {
+                    ""
+                }
+
+                val ids = if (cachedImagePath.isNotEmpty()) {
+                    // MMS: single message with image, no text splitting
+                    // Store cache path in media1 (not the base64 data)
+                    Database.getInstance(applicationContext)
+                        .insertConversationMessagesDeliveryInProgress(
+                            ConversationId(did, contact),
+                            listOf(messageText),
+                            cachedImagePath
+                        )
+                } else {
+                    // SMS: split text if needed
+                    Database.getInstance(applicationContext)
+                        .insertConversationMessagesDeliveryInProgress(
+                            ConversationId(did, contact),
+                            getMessageTexts(applicationContext, messageText)
+                        )
+                }
                 SendMessageWorker.sendMessages(applicationContext, ids)
 
                 lifecycleScope.launch(Dispatchers.Main) {

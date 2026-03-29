@@ -43,6 +43,8 @@ import net.kourlas.voipms_sms.sms.ConversationId
 import net.kourlas.voipms_sms.sms.Message
 import net.kourlas.voipms_sms.utils.httpPostWithMultipartFormData
 import net.kourlas.voipms_sms.utils.logException
+import net.kourlas.voipms_sms.utils.readCachedImageAsBase64
+import java.io.File
 import java.io.IOException
 
 /**
@@ -232,7 +234,11 @@ class SendMessageWorker(context: Context, params: WorkerParameters) :
     }
 
     @JsonClass(generateAdapter = true)
-    data class MessageResponse(val status: String, val sms: Long?)
+    data class MessageResponse(
+        val status: String,
+        val sms: Long? = null,
+        val mms: Long? = null
+    )
 
     /**
      * Sends the specified message using the VoIP.ms API
@@ -290,30 +296,47 @@ class SendMessageWorker(context: Context, params: WorkerParameters) :
             }
             return null
         }
-        if (response.sms == 0L) {
+        val messageId = response.sms ?: response.mms
+        if (messageId == null || messageId == 0L) {
             error = applicationContext.getString(
                 R.string.send_message_error_api_parse
             )
             return null
         }
-        return response.sms
+        return messageId
     }
 
     private suspend fun getMessageResponse(message: Message): MessageResponse? {
         try {
+            // Check if media1 is a local cache path (outgoing MMS)
+            // and convert it to base64 for the API call
+            val media1Base64 = if (message.media1.isNotEmpty()
+                && File(message.media1).exists()
+            ) {
+                readCachedImageAsBase64(message.media1)
+            } else {
+                null
+            }
+            val hasMedia = media1Base64 != null
+
+            val formData = mutableMapOf(
+                "api_username" to getEmail(applicationContext),
+                "api_password" to getPassword(applicationContext),
+                "method" to if (hasMedia) "sendMMS" else "sendSMS",
+                "did" to message.did,
+                "dst" to message.contact,
+                "message" to message.text
+            )
+            if (hasMedia && media1Base64 != null) {
+                formData["media1"] = media1Base64
+            }
+
             repeat(3) {
                 try {
                     return httpPostWithMultipartFormData(
                         applicationContext,
                         "https://voip.ms/api/v1/rest.php",
-                        mapOf(
-                            "api_username" to getEmail(applicationContext),
-                            "api_password" to getPassword(applicationContext),
-                            "method" to "sendSMS",
-                            "did" to message.did,
-                            "dst" to message.contact,
-                            "message" to message.text
-                        )
+                        formData
                     )
                 } catch (e: IOException) {
                     // Try again...
