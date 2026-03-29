@@ -20,7 +20,8 @@ import net.kourlas.voipms_sms.database.entities.Sms
         Draft::class,
         Deleted::class],
     autoMigrations = [
-        AutoMigration(from = 10, to = 11)
+        AutoMigration(from = 10, to = 11),
+        AutoMigration(from = 11, to = 12)
     ],
     version = DATABASE_VERSION
 )

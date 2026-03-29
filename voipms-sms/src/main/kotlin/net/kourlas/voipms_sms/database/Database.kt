@@ -501,65 +501,70 @@ class Database private constructor(private val context: Context) {
                 val addedConversationIds = mutableSetOf<ConversationId>()
                 val addedMessages = mutableListOf<Message>()
 
-                database.withTransaction {
-                    for (incomingMessage in incomingMessages) {
-                        if (retrieveDeletedMessages) {
-                            // Retrieve deleted messages is true, so we should
-                            // remove this message from our list of deleted
-                            // messages.
-                            database.deletedDao()
-                                .delete(
-                                    setOf(incomingMessage.did),
-                                    incomingMessage.voipId
-                                )
-                        } else if (database.deletedDao().get(
-                                incomingMessage.did,
-                                incomingMessage.voipId
-                            ) != null
-                        ) {
-                            // Retrieve deleted messages is not true and this
-                            // message has been previously deleted, so we
-                            // shouldn't add it back
-                            continue
-                        }
+                // Bulk-fetch existing VoipIds and deleted VoipIds in 2
+                // queries instead of per-message lookups (N+1 elimination).
+                val allDids = incomingMessages.map { it.did }.toSet()
+                val existingVoipIds = database.smsDao()
+                    .getVoipIdsByDids(allDids).toHashSet()
+                val deletedVoipIds = if (!retrieveDeletedMessages) {
+                    database.deletedDao()
+                        .getVoipIdsByDids(allDids).toHashSet()
+                } else {
+                    emptySet()
+                }
 
-                        val databaseId = database.smsDao().getIdByVoipId(
-                            incomingMessage.did, incomingMessage.voipId
-                        )
-                        if (databaseId != null) {
-                            continue
-                        }
+                // Process in batches of 100 to avoid holding a single
+                // massive transaction that locks the database.
+                for (batch in incomingMessages.chunked(100)) {
+                    database.withTransaction {
+                        for (incomingMessage in batch) {
+                            if (retrieveDeletedMessages) {
+                                database.deletedDao()
+                                    .delete(
+                                        setOf(incomingMessage.did),
+                                        incomingMessage.voipId
+                                    )
+                            } else if (incomingMessage.voipId
+                                in deletedVoipIds
+                            ) {
+                                continue
+                            }
 
-                        val sms = Sms(
-                            voipId = incomingMessage.voipId,
-                            date = incomingMessage.date.time / 1000L,
-                            incoming = if (incomingMessage.isIncoming)
-                                1L else 0L,
-                            did = incomingMessage.did,
-                            contact = incomingMessage.contact,
-                            text = incomingMessage.text ?: "",
-                            media1 = incomingMessage.media1 ?: "",
-                            media2 = incomingMessage.media2 ?: "",
-                            media3 = incomingMessage.media3 ?: "",
-                            unread = if (incomingMessage.isIncoming)
-                                1L else 0L,
-                            delivered = 1L,
-                            deliveryInProgress = 0L
-                        )
-                        val newDatabaseId = database.smsDao().insert(sms)
+                            if (incomingMessage.voipId in existingVoipIds) {
+                                continue
+                            }
 
-                        addedConversationIds.add(
-                            ConversationId(
-                                incomingMessage.did,
-                                incomingMessage.contact
+                            val sms = Sms(
+                                voipId = incomingMessage.voipId,
+                                date = incomingMessage.date.time / 1000L,
+                                incoming = if (incomingMessage.isIncoming)
+                                    1L else 0L,
+                                did = incomingMessage.did,
+                                contact = incomingMessage.contact,
+                                text = incomingMessage.text ?: "",
+                                media1 = incomingMessage.media1 ?: "",
+                                media2 = incomingMessage.media2 ?: "",
+                                media3 = incomingMessage.media3 ?: "",
+                                unread = if (incomingMessage.isIncoming)
+                                    1L else 0L,
+                                delivered = 1L,
+                                deliveryInProgress = 0L
                             )
-                        )
-                        addedMessages.add(sms.toMessage(newDatabaseId))
+                            val newDatabaseId = database.smsDao().insert(sms)
+                            existingVoipIds.add(incomingMessage.voipId)
 
-                        // Mark the conversation as unarchived.
-                        database.archivedDao().deleteConversation(
-                            incomingMessage.did, incomingMessage.contact
-                        )
+                            addedConversationIds.add(
+                                ConversationId(
+                                    incomingMessage.did,
+                                    incomingMessage.contact
+                                )
+                            )
+                            addedMessages.add(sms.toMessage(newDatabaseId))
+
+                            database.archivedDao().deleteConversation(
+                                incomingMessage.did, incomingMessage.contact
+                            )
+                        }
                     }
                 }
 
@@ -585,6 +590,18 @@ class Database private constructor(private val context: Context) {
             database.archivedDao().getConversation(
                 conversationId.did, conversationId.contact
             )?.archived == 1
+        }
+
+    /**
+     * Returns the set of all archived conversation IDs in a single query.
+     * Used to avoid per-conversation lookups when filtering.
+     */
+    suspend fun getArchivedConversationIds(): Set<ConversationId> =
+        importExportLock.read {
+            database.archivedDao().getAll()
+                .filter { it.archived == 1 }
+                .map { ConversationId(it.did, it.contact) }
+                .toSet()
         }
 
     /**
@@ -904,71 +921,37 @@ class Database private constructor(private val context: Context) {
      * This method intentionally does not use lock semantics; this is a
      * responsibility of the caller.
      */
+    // Optimized: uses a single grouped query instead of N+1 per-conversation
+    // queries. For 100 conversations this reduces ~100 queries to 1.
     private suspend fun getConversationsMessageMostRecentFilteredWithoutLock(
         dids: Set<String>,
         filterConstraint: String = "",
         contactNameCache: MutableMap<String, String>? = null
     ): List<Message> {
-        val numericFilterConstraint = getDigitsOfString(filterConstraint)
+        // Single query: get the most recent message per conversation
+        val allRecent = database.smsDao()
+            .getConversationsMostRecentMessage(dids)
 
-        var messages = mutableListOf<Message>()
-        for (conversationId in getConversationIdsWithoutLock(dids)) {
-            // If we are using filters, first check to see if our filter
-            // matches the the DID phone number, contact phone number, and
-            // message text, since we can check those using SQL.
-            if (filterConstraint.isNotEmpty()) {
-                val sms = if (numericFilterConstraint != "") {
-                    database.smsDao()
-                        .getConversationMessageMostRecentFiltered(
-                            conversationId.did,
-                            conversationId.contact,
-                            filterConstraint,
-                            numericFilterConstraint
-                        )
-                } else {
-                    database.smsDao()
-                        .getConversationMessageMostRecentFiltered(
-                            conversationId.did,
-                            conversationId.contact,
-                            filterConstraint
-                        )
-                }
+        var messages = if (filterConstraint.isEmpty()) {
+            allRecent.map { it.toMessage() }.toMutableList()
+        } else {
+            val numericFilterConstraint = getDigitsOfString(filterConstraint)
+            val lowerFilter = filterConstraint.lowercase(Locale.getDefault())
 
-                if (sms != null) {
-                    messages.add(sms.toMessage())
-                    continue
-                }
-            }
-
-            // Otherwise, simply get the most recent message for the
-            // conversation without using any filters.
-            val sms = database.smsDao()
-                .getConversationMessageMostRecent(
-                    conversationId.did,
-                    conversationId.contact
-                ) ?: continue
-
-            // If no filter constraint was provided, just add the message
-            // to the list.
-            if (filterConstraint.isEmpty()) {
-                messages.add(sms.toMessage())
-                continue
-            }
-
-            // Otherwise, check if the message matches our contact name
-            // filter. We could not check this as part of the first SQL
-            // query, since it requires an external lookup.
-            val contactName = getContactName(
-                context,
-                sms.contact,
-                contactNameCache
-            )
-            val lowercaseContactName = contactName?.lowercase(
-                Locale.getDefault()
-            )
-            if (lowercaseContactName?.contains(filterConstraint) == true) {
-                messages.add(sms.toMessage())
-            }
+            allRecent.filter { sms ->
+                // Check text content
+                sms.text.lowercase(Locale.getDefault())
+                    .contains(lowerFilter)
+                    // Check DID/contact phone numbers
+                    || (numericFilterConstraint.isNotEmpty()
+                    && (sms.contact.contains(numericFilterConstraint)
+                    || sms.did.contains(numericFilterConstraint)))
+                    // Check contact name
+                    || getContactName(
+                    context, sms.contact, contactNameCache
+                )?.lowercase(Locale.getDefault())
+                    ?.contains(lowerFilter) == true
+            }.map { it.toMessage() }.toMutableList()
         }
 
         // Replace messages with any applicable draft messages
@@ -1048,7 +1031,7 @@ class Database private constructor(private val context: Context) {
 
     companion object {
         private const val DATABASE_NAME = "sms.db"
-        const val DATABASE_VERSION = 11
+        const val DATABASE_VERSION = 12
 
         private val migration9To10 = object : Migration(9, 10) {
             override fun migrate(db: SupportSQLiteDatabase) {

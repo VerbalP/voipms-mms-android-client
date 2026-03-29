@@ -42,6 +42,14 @@ interface DeletedDao {
     )
     suspend fun get(did: String, voipId: Long): Deleted?
 
+    // Bulk fetch of all deleted VoipIds for given DIDs — used to
+    // check deletions in a single query instead of per-message lookups.
+    @Query(
+        "SELECT ${Deleted.COLUMN_VOIP_ID} FROM ${Deleted.TABLE_NAME} " +
+            "WHERE ${Deleted.COLUMN_DID} IN(:dids)"
+    )
+    suspend fun getVoipIdsByDids(dids: Set<String>): List<Long>
+
     @Insert
     suspend fun insert(deleted: Deleted): Long
 }
