@@ -137,6 +137,27 @@ interface SmsDao {
     )
     suspend fun getIdByVoipId(did: String, voipId: Long): Long?
 
+    // Single-query replacement for the N+1 pattern: returns the most
+    // recent message per (Did, Contact) conversation in one pass.
+    @Query(
+        "SELECT * FROM ${Sms.TABLE_NAME} WHERE ${Sms.COLUMN_DATABASE_ID} IN (" +
+            "SELECT MAX(${Sms.COLUMN_DATABASE_ID}) FROM ${Sms.TABLE_NAME} " +
+            "WHERE ${Sms.COLUMN_DID} IN(:dids) " +
+            "GROUP BY ${Sms.COLUMN_DID}, ${Sms.COLUMN_CONTACT}" +
+            ") ORDER BY ${Sms.COLUMN_DELIVERY_IN_PROGRESS} DESC, ${Sms.COLUMN_DATE} DESC"
+    )
+    suspend fun getConversationsMostRecentMessage(
+        dids: Set<String>
+    ): List<Sms>
+
+    // Bulk fetch of all VoipIds for given DIDs — used to check duplicates
+    // in a single query instead of per-message lookups during sync.
+    @Query(
+        "SELECT ${Sms.COLUMN_VOIP_ID} FROM ${Sms.TABLE_NAME} " +
+            "WHERE ${Sms.COLUMN_DID} IN(:dids) AND ${Sms.COLUMN_VOIP_ID} IS NOT NULL"
+    )
+    suspend fun getVoipIdsByDids(dids: Set<String>): List<Long>
+
     @Query("SELECT DISTINCT ${Sms.COLUMN_DID} FROM ${Sms.TABLE_NAME}")
     suspend fun getDids(): List<String>
 

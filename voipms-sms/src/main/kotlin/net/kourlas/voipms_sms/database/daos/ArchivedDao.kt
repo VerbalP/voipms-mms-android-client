@@ -44,6 +44,11 @@ interface ArchivedDao {
     )
     suspend fun getConversation(did: String, contact: String): Archived?
 
+    // Bulk fetch all archived conversation IDs — avoids per-conversation
+    // lookups when filtering the conversations list.
+    @Query("SELECT * FROM ${Archived.TABLE_NAME}")
+    suspend fun getAll(): List<Archived>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun update(archived: Archived)
 }
