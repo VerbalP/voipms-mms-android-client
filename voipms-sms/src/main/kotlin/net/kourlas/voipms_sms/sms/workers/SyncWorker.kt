@@ -18,7 +18,6 @@
 package net.kourlas.voipms_sms.sms.workers
 
 import android.annotation.SuppressLint
-import android.app.ForegroundServiceStartNotAllowedException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
@@ -80,6 +79,7 @@ class SyncWorker(context: Context, params: WorkerParameters) :
     CoroutineWorker(context, params) {
     private var error: String? = null
     private var progress: Int = 0
+    private var setForegroundDisabled = false
 
     override suspend fun doWork(): Result {
         try {
@@ -349,14 +349,20 @@ class SyncWorker(context: Context, params: WorkerParameters) :
             }
 
             progress = ((i + 1) * 100) / retrievalRequests.size
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-                setForeground(getForegroundInfo())
-            } else {
+            // Update the progress notification. setForeground may fail when
+            // the app is in the background and Android forbids promoting
+            // WorkManager's SystemForegroundService. On API 31+ it throws
+            // ForegroundServiceStartNotAllowedException; on API 35+ it can
+            // also throw BackgroundServiceStartNotAllowedException. Both
+            // inherit from IllegalStateException, so we catch the parent.
+            // After the first failure we skip subsequent attempts to avoid
+            // throwing the same exception once per retrieval request and
+            // wasting cycles on a notification no one will see.
+            if (!setForegroundDisabled) {
                 try {
                     setForeground(getForegroundInfo())
-                } catch (_: ForegroundServiceStartNotAllowedException) {
-                    // Do nothing -- this is expected if the app is running in
-                    // the background.
+                } catch (_: IllegalStateException) {
+                    setForegroundDisabled = true
                 }
             }
         }
