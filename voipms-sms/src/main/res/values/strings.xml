@@ -302,6 +302,7 @@
     <!-- SyncWorker -->
     <string name="sync_work_id" translatable="false">net.kourlas.voipms_sms.SYNC_WORK_ID</string>
     <string name="sync_partial_work_id" translatable="false">net.kourlas.voipms_sms.SYNC_PARTIAL_WORK_ID</string>
+    <string name="sync_immediate_work_id" translatable="false">net.kourlas.voipms_sms.SYNC_IMMEDIATE_WORK_ID</string>
     <string name="sync_force_recent" translatable="false">net.kourlas.voipms_sms.SYNC_FORCE_RECENT</string>
     <string name="sync_error_account">Sync failed: no account configured</string>
     <string name="sync_error_dids">Sync failed: no DIDs configured</string>

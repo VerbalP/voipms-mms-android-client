@@ -661,5 +661,30 @@ class SyncWorker(context: Context, params: WorkerParameters) :
                 ExistingWorkPolicy.KEEP, work
             )
         }
+
+        /**
+         * Perform an immediate, one-time synchronization with VoIP.ms, e.g. in
+         * response to a manual pull-to-refresh.
+         *
+         * Unlike [performFullSynchronization] - which, when a sync interval is
+         * configured, only (re)schedules the periodic background worker via
+         * ExistingPeriodicWorkPolicy.UPDATE and therefore does not run right
+         * away - this always enqueues a one-time expedited worker that starts
+         * immediately. It uses its own unique work name so it never clobbers
+         * the periodic background sync (sync_work_id), and leaves
+         * sync_force_recent unset so the worker still emits a "full" sync
+         * complete broadcast, which dismisses the refresh spinner. Whether the
+         * fetch covers the whole history or only recent messages is governed by
+         * the "retrieve only recent messages" preference.
+         */
+        fun performImmediateSynchronization(context: Context) {
+            val work = OneTimeWorkRequestBuilder<SyncWorker>()
+                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                .build()
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                context.getString(R.string.sync_immediate_work_id),
+                ExistingWorkPolicy.REPLACE, work
+            )
+        }
     }
 }

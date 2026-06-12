@@ -357,7 +357,7 @@ open class ConversationsActivity(val archived: Boolean = false) :
         )
         swipeRefreshLayout.setOnRefreshListener {
             adapter.refresh()
-            SyncWorker.performFullSynchronization(applicationContext)
+            SyncWorker.performImmediateSynchronization(applicationContext)
         }
         swipeRefreshLayout.setColorSchemeResources(R.color.swipe_refresh_icon)
     }
@@ -573,7 +573,7 @@ open class ConversationsActivity(val archived: Boolean = false) :
                 R.id.swipe_refresh_layout
             )
             swipeRefreshLayout.isRefreshing = true
-            SyncWorker.performFullSynchronization(applicationContext)
+            SyncWorker.performImmediateSynchronization(applicationContext)
 
             val emptyTextView = findViewById<TextView>(
                 R.id.empty_text
