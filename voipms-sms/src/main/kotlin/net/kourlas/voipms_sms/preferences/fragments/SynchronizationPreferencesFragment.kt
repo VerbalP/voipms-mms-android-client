@@ -20,13 +20,17 @@ package net.kourlas.voipms_sms.preferences.fragments
 import android.app.DatePickerDialog
 import android.content.SharedPreferences
 import android.os.Bundle
+import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import net.kourlas.voipms_sms.R
 import net.kourlas.voipms_sms.preferences.getStartDate
+import net.kourlas.voipms_sms.preferences.getUnifiedPushRegistrationSecret
 import net.kourlas.voipms_sms.preferences.setStartDate
+import net.kourlas.voipms_sms.preferences.setUnifiedPushRegistrationSecret
 import net.kourlas.voipms_sms.sms.workers.SyncWorker
+import net.kourlas.voipms_sms.utils.enablePushNotifications
 import net.kourlas.voipms_sms.utils.preferences
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -94,6 +98,22 @@ class SynchronizationPreferencesFragment : PreferenceFragmentCompat(),
             }
         }
 
+        // UnifiedPush registration secret (F-Droid flavor only; this preference
+        // is absent in other flavors). Stored encrypted via the Keystore, never
+        // in the default SharedPreferences.
+        context?.let { ctx ->
+            findPreference<EditTextPreference>(
+                getString(R.string.preferences_unifiedpush_relay_secret_key)
+            )?.let { secretPref ->
+                secretPref.text = getUnifiedPushRegistrationSecret(ctx)
+                secretPref.setOnPreferenceChangeListener { _, newValue ->
+                    setUnifiedPushRegistrationSecret(ctx, newValue as? String ?: "")
+                    enablePushNotifications(ctx.applicationContext)
+                    true
+                }
+            }
+        }
+
         // Update preference summaries
         updateSummaries()
     }
@@ -123,6 +143,11 @@ class SynchronizationPreferencesFragment : PreferenceFragmentCompat(),
         // this check is therefore required to prevent a crash
         if (isAdded && key != null) {
             updateSummary(findPreference(key))
+
+            // Re-register push when the UnifiedPush relay URL changes (F-Droid).
+            if (key == getString(R.string.preferences_unifiedpush_relay_url_key)) {
+                context?.let { enablePushNotifications(it.applicationContext) }
+            }
         }
     }
 

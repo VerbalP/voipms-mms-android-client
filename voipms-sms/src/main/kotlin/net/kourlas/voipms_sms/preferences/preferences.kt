@@ -190,6 +190,49 @@ fun getPassword(context: Context): String = getSecureStringPreference(
     ""
 )
 
+// --- UnifiedPush (F-Droid flavor) relay configuration ---
+// Relay URL and the (public) VAPID key live in normal preferences; the
+// registration secret lives in the encrypted store (Keystore), like the
+// VoIP.ms password. None of these are baked into the app source.
+
+fun getUnifiedPushRelayUrl(context: Context): String = getStringPreference(
+    context,
+    context.getString(R.string.preferences_unifiedpush_relay_url_key),
+    ""
+)
+
+fun setUnifiedPushRelayUrl(context: Context, url: String) = setStringPreference(
+    context,
+    context.getString(R.string.preferences_unifiedpush_relay_url_key),
+    url
+)
+
+fun getUnifiedPushRegistrationSecret(context: Context): String =
+    getSecureStringPreference(
+        context,
+        context.getString(R.string.preferences_unifiedpush_relay_secret_key),
+        ""
+    )
+
+fun setUnifiedPushRegistrationSecret(context: Context, secret: String) =
+    setSecureStringPreference(
+        context,
+        context.getString(R.string.preferences_unifiedpush_relay_secret_key),
+        secret
+    )
+
+fun getUnifiedPushVapidKey(context: Context): String = getStringPreference(
+    context,
+    context.getString(R.string.preferences_unifiedpush_vapid_key_key),
+    ""
+)
+
+fun setUnifiedPushVapidKey(context: Context, key: String) = setStringPreference(
+    context,
+    context.getString(R.string.preferences_unifiedpush_vapid_key_key),
+    key
+)
+
 fun getReadTimeout(context: Context): Int =
     getStringPreference(
         context,

@@ -22,10 +22,19 @@
     <string name="preferences_dids_info">The phone numbers you wish to use with this app must have SMS enabled. Otherwise, they will not appear in this list. Use the VoIP.ms &lt;a href="https://voip.ms/m/managedid.php"&gt;phone number configuration menu&lt;/a&gt; to enable SMS for your phone numbers.</string>
 
     <!-- Synchronization -->
-    <string name="preferences_sync_info">Since you are using the F-Droid version of the app, it is necessary to set a synchronization interval to retrieve new messages.</string>
+    <string name="preferences_sync_info">This F-Droid build can receive push notifications through UnifiedPush. Install a distributor app such as ntfy to get new messages instantly; otherwise, set a synchronization interval to retrieve new messages periodically.</string>
 
     <!-- ACTIVITIES -->
 
     <!-- ConversationsActivity -->
     <string name="conversations_fail_web_browser">No web browser installed</string>
+
+    <!-- UnifiedPush -->
+    <string name="push_notifications_fail_no_distributor">No UnifiedPush distributor found. Install ntfy (from F-Droid or Google Play) to receive push notifications.</string>
+    <string name="push_notifications_fail_no_relay">Set the UnifiedPush relay URL in Settings → Notifications first.</string>
+    <string name="preferences_unifiedpush_category_title">Push (UnifiedPush)</string>
+    <string name="preferences_unifiedpush_relay_url_title">Relay server URL</string>
+    <string name="preferences_unifiedpush_relay_url_summary_default">e.g. https://your-relay.example.com</string>
+    <string name="preferences_unifiedpush_relay_secret_title">Registration secret</string>
+    <string name="preferences_unifiedpush_relay_secret_summary">Shared secret used to register with the relay (stored encrypted)</string>
 </resources>
