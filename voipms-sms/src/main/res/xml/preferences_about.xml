@@ -29,7 +29,7 @@
         android:title="@string/preferences_about_changelog_title">
         <intent
             android:targetClass="net.kourlas.voipms_sms.preferences.activities.MarkdownPreferencesActivity"
-            android:targetPackage="net.kourlas.voipms_sms">
+            android:targetPackage="com.verbalp.voipms_mms">
             <extra
                 android:name="@string/preferences_markdown_extra"
                 android:value="CHANGELOG" />
@@ -40,7 +40,7 @@
         android:title="@string/preferences_about_license_title">
         <intent
             android:targetClass="net.kourlas.voipms_sms.preferences.activities.MarkdownPreferencesActivity"
-            android:targetPackage="net.kourlas.voipms_sms">
+            android:targetPackage="com.verbalp.voipms_mms">
             <extra
                 android:name="@string/preferences_markdown_extra"
                 android:value="LICENSE" />
@@ -49,7 +49,7 @@
     <androidx.preference.Preference android:title="@string/preferences_about_privacy_title">
         <intent
             android:targetClass="net.kourlas.voipms_sms.preferences.activities.MarkdownPreferencesActivity"
-            android:targetPackage="net.kourlas.voipms_sms">
+            android:targetPackage="com.verbalp.voipms_mms">
             <extra
                 android:name="@string/preferences_markdown_extra"
                 android:value="PRIVACY" />
@@ -58,7 +58,7 @@
     <androidx.preference.Preference android:title="@string/preferences_about_third_party_embedded_title">
         <intent
             android:targetClass="net.kourlas.voipms_sms.preferences.activities.MarkdownPreferencesActivity"
-            android:targetPackage="net.kourlas.voipms_sms">
+            android:targetPackage="com.verbalp.voipms_mms">
             <extra
                 android:name="@string/preferences_markdown_extra"
                 android:value="NOTICE" />
@@ -67,7 +67,7 @@
     <androidx.preference.Preference android:title="@string/preferences_about_third_party_packages_title">
         <intent
             android:targetClass="net.kourlas.voipms_sms.preferences.activities.MarkdownPreferencesActivity"
-            android:targetPackage="net.kourlas.voipms_sms">
+            android:targetPackage="com.verbalp.voipms_mms">
             <extra
                 android:name="@string/preferences_markdown_extra"
                 android:value="PACKAGE_LICENSES" />

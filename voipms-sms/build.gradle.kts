@@ -15,10 +15,10 @@ plugins {
 configure<ApplicationExtension> {
     compileSdk = 36
     defaultConfig {
-        applicationId = "net.kourlas.voipms_sms"
+        applicationId = "com.verbalp.voipms_mms"
         minSdk = 23
         targetSdk = 36
-        versionCode = 154
+        versionCode = 155
         versionName = "0.6.33"
     }
     flavorDimensions += "version"
@@ -42,14 +42,14 @@ configure<ApplicationExtension> {
         }
         create("demoNotSending") {
             dimension = "demo"
-            applicationId = "net.kourlas.voipms_sms.demo"
+            applicationId = "com.verbalp.voipms_mms.demo"
             buildConfigField("boolean", "IS_DEMO", "true")
             buildConfigField("boolean", "IS_DEMO_SENDING", "false")
             versionNameSuffix = "-demo"
         }
         create("demoSending") {
             dimension = "demo"
-            applicationId = "net.kourlas.voipms_sms.demo"
+            applicationId = "com.verbalp.voipms_mms.demo"
             buildConfigField("boolean", "IS_DEMO", "true")
             buildConfigField("boolean", "IS_DEMO_SENDING", "true")
             versionNameSuffix = "-demo"

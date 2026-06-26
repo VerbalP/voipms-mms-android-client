@@ -1,49 +1,119 @@
-# VoIP.ms SMS #
+# VoIP.ms MMS #
 
-[![Android CI (primary)](https://github.com/michaelkourlas/voipms-sms-client/actions/workflows/android-primary.yml/badge.svg)](https://github.com/michaelkourlas/voipms-sms-client/actions/workflows/android-primary.yml) [![Android CI (F-Droid)](https://github.com/michaelkourlas/voipms-sms-client/actions/workflows/android-fdroid.yml/badge.svg)](https://github.com/michaelkourlas/voipms-sms-client/actions/workflows/android-fdroid.yml)
+A clean, modern Android messaging app for [VoIP.ms](https://voip.ms) — with
+**MMS / picture messaging**, faster sync, and privacy-respecting push
+notifications.
 
-## Overview ##
+## A fork of VoIP.ms SMS ##
 
-VoIP.ms SMS is an Android messaging app for VoIP.ms that seeks to replicate the aesthetic of [Google's official SMS app](https://play.google.com/store/apps/details?id=com.google.android.apps.messaging).
+This is a fork of [VoIP.ms SMS](https://github.com/michaelkourlas/voipms-sms-client)
+by Michael Kourlas, the creator of the original app. This fork builds on top of
+his work to add MMS support and the improvements listed below. Thanks to Michael
+for releasing it as open source.
 
-[<img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png"
-    alt="Get it on Google Play"
-    height="50">](https://play.google.com/store/apps/details?id=net.kourlas.voipms_sms)
-[<img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png"
-    alt="Get it on F-Droid"
-    height="50">](https://f-droid.org/packages/net.kourlas.voipms_sms)
+The original — under the Apache 2.0 license, whose copyright notices this fork
+keeps intact — is available on
+[Google Play](https://play.google.com/store/apps/details?id=net.kourlas.voipms_sms)
+and [F-Droid](https://f-droid.org/packages/net.kourlas.voipms_sms).
 
-## Features ##
+> **Note:** this fork ships as a separate app (**VoIP.ms MMS**, application id
+> `com.verbalp.voipms_mms`), so it can be installed alongside the original
+> without conflict. See [Migration](#migration) to bring your message history
+> over.
 
-* Material design
-* Push notifications (if using the Google Play version of the app)
-* Synchronization with device contacts
-* Message search
-* Comprehensive support for synchronization with VoIP.ms
-* Completely free
+## What's new in this fork ##
 
-## Rationale ##
+### MMS & media support
+* **Send and receive MMS** — picture, audio and video messages.
+* Inline media display in conversations, with on-demand download, caching, and
+  an optional auto-download setting.
+* **Send images** via the system photo picker, with automatic compression and an
+  inline preview before sending.
+* Inline audio playback, multi-file attachments, and image thumbnails in
+  notifications.
+* Long text messages are sent as MMS instead of being truncated.
+* Fixes for escaped apostrophes and recovery of emoji-only messages (by merging
+  the VoIP.ms `getSMS` and `getMMS` results).
 
-A number of people use VoIP.ms as a cheaper alternative to subscribing to a voice plan for their mobile devices.
+### Reactions (tapbacks) support
+* Inbound SMS reactions (👍 / ❤️ / etc.) are recognized and shown as a small
+  emoji chip on the message they react to, instead of a raw
+  `Liked "…"` / `a attribué la mention …` text line. A friendly preview
+  (e.g. `👍 …`) is also used in the conversation list and notifications.
 
-Unfortunately, this can make sending text messages rather difficult, as the [VoIP.ms SMS Message Center](https://voip.ms/m/sms.php) is clearly built as a diagnostic tool for use in desktop browsers, not as an easy way to send and receive messages on a mobile device.
+### Performance improvements
+* **Conversation list loads in <100 ms** (was several seconds on large
+  databases) thanks to lazy contact loading, a single grouped query, and
+  composite database indexes.
+* Bulk duplicate detection and batched transactions during sync.
+* **Faster refresh:** pull-to-refresh now starts syncing immediately, and the
+  VoIP.ms API calls run in parallel with bounded concurrency — a full multi-DID
+  refresh dropped from ~17 s to ~6 s on a test device.
+* Resilient requests: exponential backoff with jitter, and graceful handling of
+  the VoIP.ms per-minute rate limit instead of aborting the whole sync.
 
-VoIP.ms does provide a [mobile version](https://sms.voip.ms/) of this interface with an improved UI, but it still lacks important features that are only possible with a dedicated app.
+### Sync reliability
+* Fixed background sync silently dropping messages on Android 15+ (caused by a
+  foreground-service start exception that wasn't being caught).
 
-## Installation ##
+### Push notifications without Google (F-Droid flavor)
+* Privacy-respecting push via **UnifiedPush + ntfy**, with no Google Play
+  Services or Firebase, using a small self-hostable relay.
+* **Requires the [ntfy](https://ntfy.sh) app** (a UnifiedPush distributor)
+  installed and opened on the device — it is what actually delivers the push
+  without Google. Without a UnifiedPush distributor, the app falls back to
+  periodic background sync (no instant notifications).
+* A **Default / Custom relay** toggle, and **per-DID targeted sync** so a push
+  only fetches the number it was sent for — making notifications fast.
+* The upstream Google/FCM push path is retained in the `primary` flavor.
 
-The Google Play version of the app uses closed-source Firebase libraries to
-support push notifications. The F-Droid version of the application is completely
-open source.
+## Migration ##
 
-The Google Play version of the app can be downloaded from the [Releases section](https://github.com/michaelkourlas/voipms-sms-client/releases) of the GitHub repository.
+Both the original **VoIP.ms SMS** app and this **VoIP.ms MMS** app store messages
+in a standard SQLite database and can export/import it, so you can carry your
+full message history over. Because the two apps have different application ids,
+they install side by side and you won't lose anything during the move.
+
+1. **Export from the original app.** In **VoIP.ms SMS**, go to
+   **Settings → Database → Export database** and save the file somewhere you can
+   find it (for example, your *Downloads* folder).
+2. **Install VoIP.ms MMS** (this app).
+3. **Sign in and set up.** Open VoIP.ms MMS, sign in to your VoIP.ms account, and
+   configure your DIDs and notifications.
+   *Account credentials and app settings are **not** part of the database export,
+   so they must be re-entered here.*
+4. **Import into this app.** Go to **Settings → Database → Import database** and
+   select the file you exported in step 1. The database is automatically upgraded
+   to this app's schema, and your conversations and media will appear.
+5. Once you've confirmed everything is there, you can uninstall the original app.
+
+> Only messages (and their media references) are transferred — not your account
+> credentials or settings.
+
+## Building ##
+
+The project uses two product flavors:
+
+* **`primary`** — uses Google's (closed-source) Firebase libraries for FCM push
+  notifications.
+* **`fdroid`** — completely open source; uses UnifiedPush (ntfy) for push instead
+  of Firebase.
+
+Build a debug APK with Gradle, for example:
+
+```sh
+./gradlew assembleFdroidFullDebug
+```
 
 ## Documentation ##
 
-The app's documentation is available in the [HELP.md file](https://github.com/michaelkourlas/voipms-sms-client/blob/master/HELP.md).
+General app documentation is available in the
+[HELP.md file](HELP.md).
 
 ## License ##
 
-VoIP.ms SMS is licensed under the [Apache License 2.0](http://www.apache.org/licenses/LICENSE-2.0).
+VoIP.ms MMS, like the original VoIP.ms SMS, is licensed under the
+[Apache License 2.0](http://www.apache.org/licenses/LICENSE-2.0). The original
+copyright notices by Michael Kourlas are retained throughout the source.
 
 Google Play and the Google Play logo are trademarks of Google LLC.

@@ -22,7 +22,7 @@
         <intent
             android:action="net.kourlas.voipms_sms.preferences.activities.AccountPreferencesActivity"
             android:targetClass="net.kourlas.voipms_sms.preferences.activities.AccountPreferencesActivity"
-            android:targetPackage="net.kourlas.voipms_sms" />
+            android:targetPackage="com.verbalp.voipms_mms" />
     </androidx.preference.Preference>
     <androidx.preference.Preference
         android:icon="@drawable/ic_call_settings_24dp"
@@ -30,7 +30,7 @@
         <intent
             android:action="net.kourlas.voipms_sms.preferences.activities.DidsPreferencesActivity"
             android:targetClass="net.kourlas.voipms_sms.preferences.activities.DidsPreferencesActivity"
-            android:targetPackage="net.kourlas.voipms_sms" />
+            android:targetPackage="com.verbalp.voipms_mms" />
     </androidx.preference.Preference>
     <androidx.preference.Preference
         android:icon="@drawable/ic_message_settings_24dp"
@@ -41,7 +41,7 @@
         <intent
             android:action="net.kourlas.voipms_sms.preferences.activities.SynchronizationPreferencesActivity"
             android:targetClass="net.kourlas.voipms_sms.preferences.activities.SynchronizationPreferencesActivity"
-            android:targetPackage="net.kourlas.voipms_sms" />
+            android:targetPackage="com.verbalp.voipms_mms" />
     </androidx.preference.Preference>
     <androidx.preference.Preference
         android:icon="@drawable/ic_brush_settings_24dp"
@@ -49,7 +49,7 @@
         <intent
             android:action="net.kourlas.voipms_sms.preferences.activities.AppearancePreferencesActivity"
             android:targetClass="net.kourlas.voipms_sms.preferences.activities.AppearancePreferencesActivity"
-            android:targetPackage="net.kourlas.voipms_sms" />
+            android:targetPackage="com.verbalp.voipms_mms" />
     </androidx.preference.Preference>
     <androidx.preference.Preference
         android:icon="@drawable/ic_router_settings_24dp"
@@ -57,7 +57,7 @@
         <intent
             android:action="net.kourlas.voipms_sms.preferences.activities.NetworkPreferencesActivity"
             android:targetClass="net.kourlas.voipms_sms.preferences.activities.NetworkPreferencesActivity"
-            android:targetPackage="net.kourlas.voipms_sms" />
+            android:targetPackage="com.verbalp.voipms_mms" />
     </androidx.preference.Preference>
     <androidx.preference.Preference
         android:icon="@drawable/ic_storage_settings_24dp"
@@ -65,7 +65,7 @@
         <intent
             android:action="net.kourlas.voipms_sms.preferences.activities.DatabasePreferencesActivity"
             android:targetClass="net.kourlas.voipms_sms.preferences.activities.DatabasePreferencesActivity"
-            android:targetPackage="net.kourlas.voipms_sms" />
+            android:targetPackage="com.verbalp.voipms_mms" />
     </androidx.preference.Preference>
     <androidx.preference.Preference
         android:icon="@drawable/ic_info_outline_primary_surface_24dp"
@@ -73,6 +73,6 @@
         <intent
             android:action="net.kourlas.voipms_sms.preferences.activities.AboutPreferencesActivity"
             android:targetClass="net.kourlas.voipms_sms.preferences.activities.AboutPreferencesActivity"
-            android:targetPackage="net.kourlas.voipms_sms" />
+            android:targetPackage="com.verbalp.voipms_mms" />
     </androidx.preference.Preference>
 </androidx.preference.PreferenceScreen>

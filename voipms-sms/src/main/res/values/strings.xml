@@ -421,7 +421,7 @@
     <string name="message_media">Media</string>
 
     <!-- MISCELLANEOUS -->
-    <string name="app_name">VoIP.ms SMS</string>
+    <string name="app_name">VoIP.ms MMS</string>
     <string name="copyright">Copyright © 2015–2026 Michael Kourlas</string>
     <string name="version">Version 0.6.33</string>
     <string name="toast_error">Error: %1$s</string>
