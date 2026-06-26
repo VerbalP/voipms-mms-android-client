@@ -144,8 +144,13 @@ class SynchronizationPreferencesFragment : PreferenceFragmentCompat(),
         if (isAdded && key != null) {
             updateSummary(findPreference(key))
 
-            // Re-register push when the UnifiedPush relay URL changes (F-Droid).
-            if (key == getString(R.string.preferences_unifiedpush_relay_url_key)) {
+            // Re-register push when the UnifiedPush relay URL or the
+            // default/custom toggle changes (F-Droid).
+            if (key == getString(R.string.preferences_unifiedpush_relay_url_key)
+                || key == getString(
+                    R.string.preferences_unifiedpush_relay_use_custom_key
+                )
+            ) {
                 context?.let { enablePushNotifications(it.applicationContext) }
             }
         }

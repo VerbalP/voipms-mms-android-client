@@ -218,7 +218,18 @@ class SyncWorker(context: Context, params: WorkerParameters) :
     ): List<RetrievalRequest> {
         val retrievalRequests = mutableListOf<RetrievalRequest>()
 
-        val dids = getDids(applicationContext, onlyRetrieveMessages = true)
+        val allDids = getDids(applicationContext, onlyRetrieveMessages = true)
+        // If this sync was triggered by a push that identifies a single DID,
+        // only sync that DID. Far fewer API calls -> the notification appears
+        // much faster. Falls back to all DIDs if the value is missing/unknown.
+        val singleDid = inputData.getString(
+            applicationContext.getString(R.string.sync_single_did)
+        )
+        val dids = if (singleDid != null && singleDid in allDids) {
+            setOf(singleDid)
+        } else {
+            allDids
+        }
 
         val encodedDids = dids.map { URLEncoder.encode(it, "UTF-8") }
 
@@ -659,6 +670,26 @@ class SyncWorker(context: Context, params: WorkerParameters) :
             WorkManager.getInstance(context).enqueueUniqueWork(
                 context.getString(R.string.sync_partial_work_id),
                 ExistingWorkPolicy.KEEP, work
+            )
+        }
+
+        /**
+         * Check VoIP.ms for new messages for a single DID only, e.g. in response
+         * to a push that identifies which DID received a message. Much faster
+         * than [performPartialSynchronization] since it issues API requests for
+         * just that one DID instead of all of them.
+         */
+        fun performPartialSynchronizationForDid(context: Context, did: String) {
+            val work = OneTimeWorkRequestBuilder<SyncWorker>().setInputData(
+                workDataOf(
+                    context.getString(R.string.sync_force_recent) to true,
+                    context.getString(R.string.sync_single_did) to did
+                )
+            ).setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                .build()
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                context.getString(R.string.sync_partial_work_id) + ":" + did,
+                ExistingWorkPolicy.REPLACE, work
             )
         }
 

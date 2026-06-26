@@ -195,11 +195,22 @@ fun getPassword(context: Context): String = getSecureStringPreference(
 // registration secret lives in the encrypted store (Keystore), like the
 // VoIP.ms password. None of these are baked into the app source.
 
-fun getUnifiedPushRelayUrl(context: Context): String = getStringPreference(
+fun getUnifiedPushUseCustomRelay(context: Context): Boolean = getBooleanPreference(
     context,
-    context.getString(R.string.preferences_unifiedpush_relay_url_key),
-    ""
+    context.getString(R.string.preferences_unifiedpush_relay_use_custom_key),
+    false
 )
+
+fun getUnifiedPushRelayUrl(context: Context): String =
+    if (getUnifiedPushUseCustomRelay(context)) {
+        getStringPreference(
+            context,
+            context.getString(R.string.preferences_unifiedpush_relay_url_key),
+            ""
+        )
+    } else {
+        context.getString(R.string.preferences_unifiedpush_relay_url_default_value)
+    }
 
 fun setUnifiedPushRelayUrl(context: Context, url: String) = setStringPreference(
     context,

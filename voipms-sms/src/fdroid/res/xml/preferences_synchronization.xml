@@ -61,7 +61,14 @@
 
     <androidx.preference.PreferenceCategory
         android:title="@string/preferences_unifiedpush_category_title">
+        <androidx.preference.SwitchPreference
+            android:defaultValue="false"
+            android:icon="@android:color/transparent"
+            android:key="@string/preferences_unifiedpush_relay_use_custom_key"
+            android:title="@string/preferences_unifiedpush_relay_use_custom_title"
+            android:summary="@string/preferences_unifiedpush_relay_use_custom_summary" />
         <androidx.preference.EditTextPreference
+            android:dependency="@string/preferences_unifiedpush_relay_use_custom_key"
             android:icon="@android:color/transparent"
             android:key="@string/preferences_unifiedpush_relay_url_key"
             android:title="@string/preferences_unifiedpush_relay_url_title"

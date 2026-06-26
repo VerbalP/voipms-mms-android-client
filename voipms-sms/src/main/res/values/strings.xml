@@ -308,7 +308,11 @@
     <string name="preferences_unifiedpush_relay_url_key" translatable="false">unifiedpush_relay_url</string>
     <string name="preferences_unifiedpush_relay_secret_key" translatable="false">unifiedpush_relay_secret</string>
     <string name="preferences_unifiedpush_vapid_key_key" translatable="false">unifiedpush_vapid_public_key</string>
+    <string name="preferences_unifiedpush_relay_use_custom_key" translatable="false">unifiedpush_relay_use_custom</string>
+    <!-- Default relay used when "use custom" is off. Referenced by preferences.kt (all flavors). -->
+    <string name="preferences_unifiedpush_relay_url_default_value" translatable="false">https://voipms-mms-push-relay.verbalp.workers.dev</string>
     <string name="sync_force_recent" translatable="false">net.kourlas.voipms_sms.SYNC_FORCE_RECENT</string>
+    <string name="sync_single_did" translatable="false">net.kourlas.voipms_sms.SYNC_SINGLE_DID</string>
     <string name="sync_error_account">Sync failed: no account configured</string>
     <string name="sync_error_dids">Sync failed: no DIDs configured</string>
     <string name="sync_error_network">Sync failed: network unavailable</string>

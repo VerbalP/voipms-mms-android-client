@@ -60,7 +60,9 @@ class VoipmsPushService : PushService() {
      */
     override fun onMessage(message: PushMessage, instance: String) {
         if (Notifications.getInstance(applicationContext).getNotificationsEnabled()) {
-            SyncWorker.performPartialSynchronization(applicationContext)
+            // 'instance' is the DID this push was registered for, so sync only
+            // that DID — far fewer API calls, so the notification is much faster.
+            SyncWorker.performPartialSynchronizationForDid(applicationContext, instance)
         }
     }
 

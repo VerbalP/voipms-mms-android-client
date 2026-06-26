@@ -31,8 +31,10 @@
 
     <!-- UnifiedPush -->
     <string name="push_notifications_fail_no_distributor">No UnifiedPush distributor found. Install ntfy (from F-Droid or Google Play) to receive push notifications.</string>
-    <string name="push_notifications_fail_no_relay">Set the UnifiedPush relay URL in Settings → Notifications first.</string>
+    <string name="push_notifications_fail_no_relay">Set the UnifiedPush relay URL in Settings → Synchronization first.</string>
     <string name="preferences_unifiedpush_category_title">Push (UnifiedPush)</string>
+    <string name="preferences_unifiedpush_relay_use_custom_title">Use a custom relay server</string>
+    <string name="preferences_unifiedpush_relay_use_custom_summary">Off: use the built-in default relay. On: enter your own relay URL below.</string>
     <string name="preferences_unifiedpush_relay_url_title">Relay server URL</string>
     <string name="preferences_unifiedpush_relay_url_summary_default">e.g. https://your-relay.example.com</string>
     <string name="preferences_unifiedpush_relay_secret_title">Registration secret</string>
