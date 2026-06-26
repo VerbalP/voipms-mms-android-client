@@ -65,6 +65,7 @@ import net.kourlas.voipms_sms.utils.getFormattedPhoneNumber
 import net.kourlas.voipms_sms.utils.getMediaExtension
 import net.kourlas.voipms_sms.utils.getMediaType
 import net.kourlas.voipms_sms.utils.MediaType
+import net.kourlas.voipms_sms.utils.MessageReactions
 import net.kourlas.voipms_sms.utils.logException
 import java.io.File
 import java.util.Date
@@ -686,7 +687,9 @@ class Notifications private constructor(private val context: Context) {
         if (messages.isNotEmpty()) {
             for (message in messages.reversed()) {
                 if (existingMessages.isNotEmpty()
-                    && existingMessages.last().text == message.summaryDisplayText
+                    && existingMessages.last().text
+                    == (MessageReactions.previewFor(message.text)
+                        ?: message.summaryDisplayText)
                     && existingMessages.last().person != null
                     && existingMessages.last().timestamp == message.date.time
                 ) {
@@ -708,7 +711,7 @@ class Notifications private constructor(private val context: Context) {
         } else if (messagesToAdd.isNotEmpty()) {
             val notificationMessages = messagesToAdd.map {
                 val msg = NotificationCompat.MessagingStyle.Message(
-                    it.summaryDisplayText,
+                    MessageReactions.previewFor(it.text) ?: it.summaryDisplayText,
                     it.date.time,
                     if (it.isIncoming)
                         Person.Builder()

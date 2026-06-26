@@ -74,6 +74,7 @@ import net.kourlas.voipms_sms.sms.Message
 import net.kourlas.voipms_sms.ui.FastScroller
 import net.kourlas.voipms_sms.utils.applyCircularMask
 import net.kourlas.voipms_sms.utils.applyRoundedCornersMask
+import net.kourlas.voipms_sms.utils.MessageReactions
 import net.kourlas.voipms_sms.utils.getConversationViewDate
 import net.kourlas.voipms_sms.utils.getConversationViewTopDate
 import net.kourlas.voipms_sms.utils.getScrollBarDate
@@ -109,6 +110,10 @@ class ConversationRecyclerViewAdapter(
     private val _messageItems = mutableListOf<MessageItem>()
     val messageItems: List<MessageItem>
         get() = _messageItems
+
+    // Reaction emojis to display, keyed by the database ID of the message they
+    // react to. Reaction messages themselves are removed from the item list.
+    private var reactionsByMessageId: Map<Long, List<String>> = emptyMap()
 
     // Current and previous filter constraint.
     private var currConstraint: String = ""
@@ -158,8 +163,31 @@ class ConversationRecyclerViewAdapter(
         updateViewHolderContactBadge(holder, position)
         updateViewHolderMedia(holder, position)
         updateViewHolderMessageText(holder, position)
+        updateViewHolderReactions(holder, position)
         updateViewHolderDateText(holder, position)
         updateViewHolderColours(holder, position)
+    }
+
+    /**
+     * Displays any reactions ("tapbacks") that target the message at the given
+     * position, as an emoji chip tucked under the message bubble. The reaction
+     * messages themselves are not shown as separate bubbles.
+     *
+     * @param holder The message view holder to use.
+     * @param position The position of the view in the adapter.
+     */
+    private fun updateViewHolderReactions(
+        holder: MessageViewHolder,
+        position: Int
+    ) {
+        val message = messageItems[position].message
+        val emojis = reactionsByMessageId[message.databaseId]
+        if (emojis.isNullOrEmpty()) {
+            holder.reactionsView.visibility = View.GONE
+        } else {
+            holder.reactionsView.text = emojis.joinToString(" ")
+            holder.reactionsView.visibility = View.VISIBLE
+        }
     }
 
     /**
@@ -1026,14 +1054,23 @@ class ConversationRecyclerViewAdapter(
                     if (currLimit > maxLimit) {
                         currLimit = max(maxLimit, ADDITIONAL_ITEMS_INCREMENT)
                     }
-                    resultsObject.messages.addAll(
-                        Database.getInstance(activity)
-                            .getConversationMessagesFiltered(
-                                conversationId,
-                                filterString,
-                                currLimit
-                            ).asReversed()
-                    )
+                    // Oldest first, matching the conversation view order.
+                    val messages = Database.getInstance(activity)
+                        .getConversationMessagesFiltered(
+                            conversationId,
+                            filterString,
+                            currLimit
+                        ).asReversed()
+                    if (filterString.isEmpty()) {
+                        // Collapse reactions onto their target messages. When a
+                        // search filter is active we leave messages untouched so
+                        // that reaction text remains searchable.
+                        val result = MessageReactions.process(messages)
+                        resultsObject.messages.addAll(result.visibleMessages)
+                        resultsObject.reactions = result.reactionsByMessageId
+                    } else {
+                        resultsObject.messages.addAll(messages)
+                    }
                 }
             } else {
                 resultsObject.messages.addAll(
@@ -1082,6 +1119,9 @@ class ConversationRecyclerViewAdapter(
             // no choice but to use an unchecked cast
             val resultsObject = results.values as ConversationFilter
             val newMessages = resultsObject.messages
+
+            // Update reactions before binding so view holders pick them up.
+            reactionsByMessageId = resultsObject.reactions
 
             // Create copy of current messages
             val oldMessages = mutableListOf<Message>()
@@ -1211,6 +1251,7 @@ class ConversationRecyclerViewAdapter(
      */
     class ConversationFilter {
         internal val messages = mutableListOf<Message>()
+        internal var reactions: Map<Long, List<String>> = emptyMap()
     }
 
     /**
@@ -1303,6 +1344,8 @@ class ConversationRecyclerViewAdapter(
             itemView.findViewById(R.id.media_container)
         internal val messageText: TextView =
             itemView.findViewById(R.id.message)
+        internal val reactionsView: TextView =
+            itemView.findViewById(R.id.reactions)
         internal val dateText: TextView =
             itemView.findViewById(R.id.date)
         internal val topDateText: TextView =

@@ -221,7 +221,10 @@ class ConversationsRecyclerViewAdapter<T>(
         val conversationItem = conversationItems[position]
         val message = conversationItem.message
 
-        val text = message.summaryDisplayText
+        // Show reactions ("tapbacks") as a friendly preview (e.g. "👍 Merci !")
+        // instead of the raw "a attribué la mention…" sentence.
+        val text = MessageReactions.previewFor(message.text)
+            ?: message.summaryDisplayText
         val messageTextBuilder = SpannableStringBuilder()
 
         if (message.text != "") {

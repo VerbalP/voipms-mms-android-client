@@ -11,4 +11,8 @@
     <color name="settings_icon">@android:color/white</color>
 
     <color name="colorPrimaryDark">#141414</color>
+
+    <!-- Reaction (tapback) chip: a slightly raised dark surface -->
+    <color name="reaction_chip_background">#404040</color>
+    <color name="reaction_chip_stroke">#6A6A6A</color>
 </resources>

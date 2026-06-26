@@ -52,6 +52,10 @@
     <color name="delete_swipe">@color/primary_variant</color>
     <color name="archive_swipe">#188038</color>
 
+    <!-- Reaction (tapback) chip; overridden in values-night for dark theme -->
+    <color name="reaction_chip_background">#EEEEEE</color>
+    <color name="reaction_chip_stroke">#BDBDBD</color>
+
     <!-- Material design colors -->
     <color name="colorAccent">@color/primary</color>
     <color name="colorOnPrimary">@color/primary_text</color>
