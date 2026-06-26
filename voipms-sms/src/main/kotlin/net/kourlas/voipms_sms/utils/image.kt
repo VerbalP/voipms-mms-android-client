@@ -127,6 +127,40 @@ fun readCachedMediaAsBase64(filePath: String): String? {
 }
 
 /**
+ * Returns true if [file] holds decodable media of [type], as opposed to an
+ * error response. VoIP.ms serves media that has passed its retention window
+ * as an HTTP 200 whose body is a short text error (e.g. "Not found"); without
+ * this check that text gets cached and rendered as a broken, un-openable
+ * attachment whose tap-to-open silently fails.
+ */
+fun isValidMediaFile(file: File, type: MediaType): Boolean {
+    if (!file.exists() || file.length() <= 0L) return false
+    return when (type) {
+        MediaType.IMAGE, MediaType.GIF -> {
+            val options = BitmapFactory.Options().apply {
+                inJustDecodeBounds = true
+            }
+            BitmapFactory.decodeFile(file.absolutePath, options)
+            options.outWidth > 0 && options.outHeight > 0
+        }
+        MediaType.VIDEO, MediaType.AUDIO -> {
+            try {
+                val retriever = MediaMetadataRetriever()
+                retriever.setDataSource(file.absolutePath)
+                val duration = retriever.extractMetadata(
+                    MediaMetadataRetriever.METADATA_KEY_DURATION
+                )
+                retriever.release()
+                duration != null
+            } catch (_: Exception) {
+                false
+            }
+        }
+        MediaType.OTHER -> true
+    }
+}
+
+/**
  * Generates a thumbnail for a media file and caches it.
  * Returns the cached thumbnail path, or null for audio (use icon instead).
  */

@@ -61,6 +61,7 @@ import net.kourlas.voipms_sms.utils.MediaType
 import net.kourlas.voipms_sms.utils.generateThumbnail
 import net.kourlas.voipms_sms.utils.getMediaExtension
 import net.kourlas.voipms_sms.utils.getMediaType
+import net.kourlas.voipms_sms.utils.isValidMediaFile
 import okhttp3.Request
 import java.io.File
 import kotlinx.coroutines.runBlocking
@@ -277,12 +278,16 @@ class ConversationRecyclerViewAdapter(
                 Spanned.SPAN_INCLUSIVE_EXCLUSIVE
             )
         } else {
-            // Highlight text that matches filter
-            messageTextBuilder.append(message.text)
+            // Use the trimmed body so carrier whitespace/newline-only MMS
+            // text parts don't inflate the bubble with empty space.
+            val displayText = message.text.trim()
+            val textStart = messageTextBuilder.length
+            messageTextBuilder.append(displayText)
+
+            // Highlight text that matches the search filter
             if (currConstraint != "") {
-                messageTextBuilder.append(message.text)
                 val index =
-                    message.text.lowercase(Locale.getDefault()).indexOf(
+                    displayText.lowercase(Locale.getDefault()).indexOf(
                         currConstraint.lowercase(Locale.getDefault())
                     )
                 if (index != -1) {
@@ -292,8 +297,8 @@ class ConversationRecyclerViewAdapter(
                                 activity, R.color.highlight
                             )
                         ),
-                        index,
-                        index + currConstraint.length,
+                        textStart + index,
+                        textStart + index + currConstraint.length,
                         SpannableString.SPAN_INCLUSIVE_EXCLUSIVE
                     )
                     messageTextBuilder.setSpan(
@@ -302,25 +307,33 @@ class ConversationRecyclerViewAdapter(
                                 activity, android.R.color.black
                             )
                         ),
-                        index,
-                        index + currConstraint.length,
+                        textStart + index,
+                        textStart + index + currConstraint.length,
                         SpannableString.SPAN_INCLUSIVE_EXCLUSIVE
                     )
                 }
             }
 
-            // Show media URLs only for incoming messages (not local files)
-            val hasRemoteMedia = message.medias.any {
+            // Only list media that can't be rendered inline (unsupported
+            // types). Loadable media already appears as an inline thumbnail,
+            // so showing its raw URL as text would be redundant.
+            val unrenderedMedia = message.medias.filter {
                 !File(it).exists() && it.isNotEmpty()
+                    && !isLoadableMediaUrl(it)
             }
-            if (hasRemoteMedia) {
-                if (message.text != "") {
+            if (unrenderedMedia.isNotEmpty()) {
+                if (messageTextBuilder.isNotEmpty()) {
                     messageTextBuilder.append("\n\n")
                 }
 
                 val length = messageTextBuilder.length
-
-                messageTextBuilder.append(message.mediaDisplayText)
+                messageTextBuilder.append(
+                    unrenderedMedia.joinToString("\n\n") {
+                        activity.getString(
+                            R.string.conversation_info_media, it
+                        )
+                    }
+                )
                 messageTextBuilder.setSpan(
                     StyleSpan(Typeface.ITALIC), length,
                     messageTextBuilder.length,
@@ -330,6 +343,8 @@ class ConversationRecyclerViewAdapter(
         }
 
         messageText.text = messageTextBuilder
+        messageText.visibility =
+            if (messageTextBuilder.isEmpty()) View.GONE else View.VISIBLE
 
         Linkify.addLinks(
             messageText,
@@ -367,6 +382,19 @@ class ConversationRecyclerViewAdapter(
         val cacheDir = File(activity.cacheDir, "media")
         cacheDir.mkdirs()
         return File(cacheDir, "thumb_$hash.jpeg")
+    }
+
+    /**
+     * Marker file recording that a previous download produced a non-media
+     * response (e.g. VoIP.ms "Not found" for expired media). Its presence
+     * stops the auto-download loop and shows an "unavailable" state instead
+     * of caching the error body as a broken attachment.
+     */
+    private fun getMediaFailedMarker(mediaUrl: String): File {
+        val hash = mediaUrl.hashCode().toUInt().toString(16)
+        val cacheDir = File(activity.cacheDir, "media")
+        cacheDir.mkdirs()
+        return File(cacheDir, "$hash.failed")
     }
 
     // Active MediaPlayer instance for audio playback
@@ -420,19 +448,32 @@ class ConversationRecyclerViewAdapter(
                 } else {
                     // --- INCOMING: remote URL ---
                     val cachedFile = getMediaCacheFile(mediaUrl)
+                    val failedMarker = getMediaFailedMarker(mediaUrl)
 
-                    if (cachedFile.exists()) {
-                        addCachedMediaView(
+                    // Demote legacy junk: a tiny cache file is an error body
+                    // (e.g. VoIP.ms "Not found") cached by an older build, not
+                    // real media. Mark it failed so it isn't shown as openable.
+                    if (cachedFile.exists()
+                        && cachedFile.length() < MIN_VALID_MEDIA_BYTES
+                    ) {
+                        cachedFile.delete()
+                        failedMarker.createNewFile()
+                    }
+
+                    when {
+                        cachedFile.exists() -> addCachedMediaView(
                             mediaContainer, cachedFile, mediaType,
                             mediaWidthPx, marginBottomPx
                         )
-                    } else if (shouldAutoDownload) {
-                        addAutoDownloadView(
+                        failedMarker.exists() -> addUnavailableView(
                             mediaContainer, mediaUrl, cachedFile, mediaType,
                             mediaWidthPx, marginBottomPx, placeholderHeightPx
                         )
-                    } else {
-                        addPlaceholderView(
+                        shouldAutoDownload -> addAutoDownloadView(
+                            mediaContainer, mediaUrl, cachedFile, mediaType,
+                            mediaWidthPx, marginBottomPx, placeholderHeightPx
+                        )
+                        else -> addPlaceholderView(
                             mediaContainer, mediaUrl, cachedFile, mediaType,
                             mediaWidthPx, marginBottomPx, placeholderHeightPx
                         )
@@ -586,6 +627,38 @@ class ConversationRecyclerViewAdapter(
         container.addView(placeholder)
     }
 
+    /**
+     * Shows an "unavailable" tile for media whose download returned a
+     * non-media response (typically expired media). Tapping it clears the
+     * failed marker and retries the download rather than opening a broken
+     * file.
+     */
+    private fun addUnavailableView(
+        container: LinearLayout, mediaUrl: String, cachedFile: File,
+        type: MediaType, widthPx: Int, marginPx: Int, placeholderHeight: Int,
+        index: Int = -1
+    ) {
+        val view = LayoutInflater.from(activity)
+            .inflate(R.layout.media_placeholder, container, false)
+        view.layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, placeholderHeight
+        ).apply { bottomMargin = marginPx }
+
+        val icon = view.findViewById<ImageView>(android.R.id.icon)
+            ?: (view as? ViewGroup)?.getChildAt(0) as? ImageView
+        icon?.setImageResource(android.R.drawable.ic_menu_report_image)
+
+        view.setOnClickListener {
+            getMediaFailedMarker(mediaUrl).delete()
+            downloadMediaWithProgress(
+                container, view, mediaUrl, cachedFile, type, widthPx, marginPx
+            )
+        }
+
+        if (index >= 0) container.addView(view, index)
+        else container.addView(view)
+    }
+
     /** Auto-downloads immediately with a progress indicator. */
     private fun addAutoDownloadView(
         container: LinearLayout, mediaUrl: String, cachedFile: File,
@@ -643,7 +716,13 @@ class ConversationRecyclerViewAdapter(
                 val request = Request.Builder().url(mediaUrl).build()
                 val response = HttpClientManager.getInstance().client
                     .newCall(request).execute()
-                if (!response.isSuccessful) return@launch
+                if (!response.isSuccessful) {
+                    handleMediaDownloadFailure(
+                        container, progressView, mediaUrl, cachedFile,
+                        type, widthPx, marginPx
+                    )
+                    return@launch
+                }
 
                 val totalBytes = response.body.contentLength()
                 var downloadedBytes = 0L
@@ -669,6 +748,18 @@ class ConversationRecyclerViewAdapter(
                         }
                     }
                 }
+
+                // VoIP.ms returns HTTP 200 with a short text error body for
+                // expired media; reject anything that isn't decodable media so
+                // it isn't cached and shown as a broken attachment.
+                if (!isValidMediaFile(cachedFile, type)) {
+                    handleMediaDownloadFailure(
+                        container, progressView, mediaUrl, cachedFile,
+                        type, widthPx, marginPx
+                    )
+                    return@launch
+                }
+                getMediaFailedMarker(mediaUrl).delete()
 
                 withContext(Dispatchers.Main) {
                     val idx = container.indexOfChild(progressView)
@@ -700,8 +791,36 @@ class ConversationRecyclerViewAdapter(
                     }
                 }
             } catch (_: Exception) {
-                // Keep progress view visible on failure
+                handleMediaDownloadFailure(
+                    container, progressView, mediaUrl, cachedFile,
+                    type, widthPx, marginPx
+                )
             }
+        }
+    }
+
+    /**
+     * Handles a failed/expired media download: drops the partial or
+     * non-media file, records a failed marker so auto-download won't loop,
+     * and replaces the progress tile with a tappable "unavailable" tile.
+     */
+    private suspend fun handleMediaDownloadFailure(
+        container: LinearLayout, progressView: View, mediaUrl: String,
+        cachedFile: File, type: MediaType, widthPx: Int, marginPx: Int
+    ) {
+        cachedFile.delete()
+        getMediaFailedMarker(mediaUrl).createNewFile()
+        withContext(Dispatchers.Main) {
+            val idx = container.indexOfChild(progressView)
+            if (idx >= 0) container.removeView(progressView)
+            addUnavailableView(
+                container, mediaUrl, cachedFile, type,
+                widthPx, marginPx, widthPx / 2, idx
+            )
+            showSnackbar(
+                activity, R.id.coordinator_layout,
+                activity.getString(R.string.conversation_media_unavailable)
+            )
         }
     }
 
@@ -1371,6 +1490,11 @@ class ConversationRecyclerViewAdapter(
         // Strict regex for VoIP.ms media URLs to prevent path traversal.
         private val LOADABLE_MEDIA_URL_PATTERN =
             Regex("^https://voip\\.ms/media/[a-zA-Z0-9_=-]+/media\\.(jpeg|jpg|gif|png|mp3|wav|midi|mp4|3gp)$")
+
+        // A cached media file smaller than this is treated as a non-media
+        // error body (VoIP.ms returns short text like "Not found" for expired
+        // media), never as a real attachment. Real MMS media is always KBs.
+        private const val MIN_VALID_MEDIA_BYTES = 256L
 
         // The number of additional items to retrieve when loadMoreItems is
         // called.

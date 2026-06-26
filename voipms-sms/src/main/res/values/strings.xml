@@ -188,6 +188,7 @@
     <string name="conversation_info_to">To: %1$s</string>
     <string name="conversation_info_media">Media: %1$s</string>
     <string name="conversation_media_download">Download</string>
+    <string name="conversation_media_unavailable">Media unavailable — it may have expired. Touch to retry.</string>
     <string name="conversation_message_clipboard_description">Text message</string>
     <string name="conversation_message_not_sent">Not sent. Touch to try again.</string>
     <string name="conversation_message_sending">Sending…</string>
