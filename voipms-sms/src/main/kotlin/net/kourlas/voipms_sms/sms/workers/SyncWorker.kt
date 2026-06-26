@@ -36,8 +36,13 @@ import androidx.work.workDataOf
 import com.squareup.moshi.JsonClass
 import com.squareup.moshi.JsonDataException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import net.kourlas.voipms_sms.R
 import net.kourlas.voipms_sms.database.Database
 import net.kourlas.voipms_sms.network.NetworkManager
@@ -70,7 +75,9 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.ceil
+import kotlin.random.Random
 
 /**
  * Worker used to synchronize the database with VoIP.ms.
@@ -346,37 +353,52 @@ class SyncWorker(context: Context, params: WorkerParameters) :
         retrievalRequests: List<RetrievalRequest>,
         retrieveDeletedMessages: Boolean
     ) = coroutineScope {
-        val incomingMessages = mutableListOf<IncomingMessage>()
-        for (i in retrievalRequests.indices) {
-            ensureActive()
+        // Process the retrieval requests concurrently, but cap how many hit
+        // the VoIP.ms API at once. The shared OkHttp client already limits to
+        // 5 requests per host, and VoIP.ms is slow and rate-limits per minute,
+        // so a small bound keeps the refresh fast (requests overlap instead of
+        // running one after another) without risking throttling or timeouts.
+        val semaphore = Semaphore(
+            minOf(MAX_CONCURRENT_REQUESTS, maxOf(1, retrievalRequests.size))
+        )
+        val completed = AtomicInteger(0)
+        val results = retrievalRequests.map { request ->
+            async {
+                semaphore.withPermit {
+                    ensureActive()
+                    val result = processRetrievalRequest(request)
 
-            val nextIncomingMessages = processRetrievalRequest(
-                retrievalRequests[i]
-            )
-            if (nextIncomingMessages != null) {
-                incomingMessages.addAll(nextIncomingMessages)
-            } else {
-                return@coroutineScope
-            }
+                    // Update the progress notification as each request
+                    // finishes. setForeground may fail when the app is in the
+                    // background and Android forbids promoting WorkManager's
+                    // SystemForegroundService. On API 31+ it throws
+                    // ForegroundServiceStartNotAllowedException; on API 35+ it
+                    // can also throw BackgroundServiceStartNotAllowedException.
+                    // Both inherit from IllegalStateException, so we catch the
+                    // parent. After the first failure we skip subsequent
+                    // attempts to avoid throwing once per request.
+                    progress = (completed.incrementAndGet() * 100) /
+                        retrievalRequests.size
+                    if (!setForegroundDisabled) {
+                        try {
+                            setForeground(getForegroundInfo())
+                        } catch (_: IllegalStateException) {
+                            setForegroundDisabled = true
+                        }
+                    }
 
-            progress = ((i + 1) * 100) / retrievalRequests.size
-            // Update the progress notification. setForeground may fail when
-            // the app is in the background and Android forbids promoting
-            // WorkManager's SystemForegroundService. On API 31+ it throws
-            // ForegroundServiceStartNotAllowedException; on API 35+ it can
-            // also throw BackgroundServiceStartNotAllowedException. Both
-            // inherit from IllegalStateException, so we catch the parent.
-            // After the first failure we skip subsequent attempts to avoid
-            // throwing the same exception once per retrieval request and
-            // wasting cycles on a notification no one will see.
-            if (!setForegroundDisabled) {
-                try {
-                    setForeground(getForegroundInfo())
-                } catch (_: IllegalStateException) {
-                    setForegroundDisabled = true
+                    result
                 }
             }
+        }.awaitAll()
+
+        // A null result means a request failed (error is already set). Abort
+        // without inserting anything, matching the previous all-or-nothing
+        // behavior so we never persist a partial/inconsistent sync.
+        if (results.any { it == null }) {
+            return@coroutineScope
         }
+        val incomingMessages = results.filterNotNull().flatten()
 
         // Merge getMMS and getSMS results: prefer SMS text when MMS
         // text is empty (VoIP.ms API drops emoji text in getMMS)
@@ -547,15 +569,31 @@ class SyncWorker(context: Context, params: WorkerParameters) :
         request: RetrievalRequest
     ): MessagesResponse? {
         try {
-            repeat(3) {
+            for (attempt in 0 until MAX_REQUEST_ATTEMPTS) {
+                val lastAttempt = attempt == MAX_REQUEST_ATTEMPTS - 1
                 try {
-                    return httpPostWithMultipartFormData(
-                        applicationContext,
-                        "https://voip.ms/api/v1/rest.php",
-                        request.formData
-                    )
+                    val response: MessagesResponse? =
+                        httpPostWithMultipartFormData(
+                            applicationContext,
+                            "https://voip.ms/api/v1/rest.php",
+                            request.formData
+                        )
+                    // VoIP.ms rate-limits API requests per minute and returns
+                    // this status (with HTTP 200) when the limit is reached.
+                    // Back off and retry instead of failing the whole sync.
+                    if (response?.status == "api_limit_exceeded"
+                        && !lastAttempt
+                    ) {
+                        delay(backoffDelay(attempt))
+                        continue
+                    }
+                    return response
                 } catch (e: IOException) {
-                    // Try again...
+                    // Transient network/timeout error. Back off before
+                    // retrying, which matters more now that requests run
+                    // concurrently (more chance of a slow connection).
+                    if (lastAttempt) break
+                    delay(backoffDelay(attempt))
                 }
             }
             error = applicationContext.getString(
@@ -572,6 +610,14 @@ class SyncWorker(context: Context, params: WorkerParameters) :
             return null
         }
     }
+
+    /**
+     * Exponential backoff with jitter for the request retries: roughly 0.5s,
+     * 1s, 2s, plus up to 250 ms of random jitter so concurrent requests that
+     * get rate-limited together don't all retry in lockstep.
+     */
+    private fun backoffDelay(attempt: Int): Long =
+        BASE_BACKOFF_MS * (1L shl attempt) + Random.nextLong(0, 250)
 
     /**
      * A message received from the VoIP.ms API.
@@ -614,6 +660,17 @@ class SyncWorker(context: Context, params: WorkerParameters) :
     )
 
     companion object {
+        // Maximum number of VoIP.ms API requests run concurrently during a
+        // sync. Kept small: the shared OkHttp client already caps at 5
+        // requests per host and VoIP.ms rate-limits per minute, so this
+        // overlaps requests for a much faster refresh without throttling.
+        private const val MAX_CONCURRENT_REQUESTS = 4
+
+        // Each API request is attempted up to this many times (transient
+        // IOException or per-minute rate limit), with exponential backoff.
+        private const val MAX_REQUEST_ATTEMPTS = 3
+        private const val BASE_BACKOFF_MS = 500L
+
         /**
          * Synchronize the database with VoIP.ms.
          *
