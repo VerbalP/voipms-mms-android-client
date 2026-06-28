@@ -32,8 +32,9 @@ and [F-Droid](https://f-droid.org/packages/net.kourlas.voipms_sms).
 * Inline audio playback, multi-file attachments, and image thumbnails in
   notifications.
 * Long text messages are sent as MMS instead of being truncated.
-* Fixes for escaped apostrophes and recovery of emoji-only messages (by merging
-  the VoIP.ms `getSMS` and `getMMS` results).
+* **Non-Latin text preserved** — Chinese, emoji and other non-Latin characters
+  are no longer dropped or truncated by the API.
+* Escaped apostrophes returned by the VoIP.ms API are unescaped correctly.
 
 ### Reactions (tapbacks) support
 * Inbound SMS reactions (👍 / ❤️ / etc.) are recognized and shown as a small
