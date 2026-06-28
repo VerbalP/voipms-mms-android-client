@@ -400,25 +400,23 @@ class SyncWorker(context: Context, params: WorkerParameters) :
         }
         val incomingMessages = results.filterNotNull().flatten()
 
-        // Merge getMMS and getSMS results: prefer SMS text when MMS
-        // text is empty (VoIP.ms API drops emoji text in getMMS)
+        // Merge getMMS and getSMS records for the same message (same voipId).
+        // getMMS carries the media, but its text drops non-Latin characters
+        // (emoji, Chinese, ...) — sometimes to an empty string, sometimes to a
+        // partially stripped one (e.g. "iOSAPI20266249"). getSMS always has the
+        // correct full text. So take the text from the getSMS record and the
+        // media from the getMMS record.
         val mergedMessages = incomingMessages
             .groupBy { it.voipId }
             .map { (_, msgs) ->
                 if (msgs.size == 1) msgs.first()
                 else {
-                    val mms = msgs.firstOrNull {
-                        !it.media1.isNullOrEmpty()
-                            || !it.media2.isNullOrEmpty()
-                            || !it.media3.isNullOrEmpty()
-                    } ?: msgs.first()
-                    val sms = msgs.firstOrNull {
-                        !it.text.isNullOrEmpty()
-                    } ?: msgs.first()
+                    val mms = msgs.firstOrNull { it.fromMms } ?: msgs.first()
+                    val sms = msgs.firstOrNull { !it.fromMms } ?: mms
                     IncomingMessage(
                         mms.voipId, mms.date, mms.isIncoming,
                         mms.did, mms.contact,
-                        if (mms.text.isNullOrEmpty()) sms.text else mms.text,
+                        if (!sms.text.isNullOrEmpty()) sms.text else mms.text,
                         mms.media1, mms.media2, mms.media3
                     )
                 }
@@ -545,7 +543,8 @@ class SyncWorker(context: Context, params: WorkerParameters) :
                         stripSlashes(message.message),
                         message.col_media1,
                         message.col_media2,
-                        message.col_media3
+                        message.col_media3,
+                        request.formData["method"] == "getMMS"
                     )
                     incomingMessages.add(incomingMessage)
                 } catch (e: Exception) {
@@ -632,6 +631,9 @@ class SyncWorker(context: Context, params: WorkerParameters) :
      * @param media1 The URI to the first media associated with the message.
      * @param media2 The URI to the second media associated with the message.
      * @param media3 The URI to the third media associated with the message.
+     * @param fromMms Whether this record came from getMMS (true) or getSMS
+     * (false). getMMS carries media but strips non-Latin text; getSMS has the
+     * correct text. Used by the merge to pick the right text vs media source.
      */
     data class IncomingMessage(
         val voipId: Long,
@@ -642,7 +644,8 @@ class SyncWorker(context: Context, params: WorkerParameters) :
         val text: String?,
         val media1: String?,
         val media2: String?,
-        val media3: String?
+        val media3: String?,
+        val fromMms: Boolean = false
     ) {
         init {
             validatePhoneNumber(did)
