@@ -37,15 +37,18 @@ class FcmListenerService : FirebaseMessagingService() {
         // Called when a FCM message is received; check to see if topic matches
         // a currently configured DID
         val dids = getDids(applicationContext, onlyShowNotifications = true)
-        val match = dids.any { message.from == "/topics/did-$it" }
-        if (match) {
+        val matchedDid = dids.firstOrNull { message.from == "/topics/did-$it" }
+        if (matchedDid != null) {
             // If so, and if notifications are enabled, update the message
-            // database and shows notifications for any new messages
+            // database and show notifications for any new messages. The topic
+            // IS the DID, so sync only that DID — far fewer API calls.
             if (Notifications.getInstance(
                     application
                 ).getNotificationsEnabled()
             ) {
-                SyncWorker.performPartialSynchronization(applicationContext)
+                SyncWorker.performPartialSynchronizationForDid(
+                    applicationContext, matchedDid
+                )
             }
         } else {
             // Otherwise, unsubscribe from this topic

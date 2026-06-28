@@ -39,6 +39,7 @@ import net.kourlas.voipms_sms.preferences.didsConfigured
 import net.kourlas.voipms_sms.preferences.getDids
 import net.kourlas.voipms_sms.preferences.getEmail
 import net.kourlas.voipms_sms.preferences.getPassword
+import net.kourlas.voipms_sms.preferences.getUnifiedPushRelayUrl
 import net.kourlas.voipms_sms.utils.httpPostWithMultipartFormData
 import net.kourlas.voipms_sms.utils.logException
 import java.io.IOException
@@ -148,8 +149,9 @@ class NotificationsRegistrationWorker(
                             "enable" to "1",
                             "url_callback_enable" to "1",
                             ("url_callback"
-                                to "https://voipmssms-notify.kourlas.com/"
-                                + "?did={TO}"),
+                                to getUnifiedPushRelayUrl(applicationContext)
+                                    .trimEnd('/')
+                                + "/fcm?did={TO}"),
                             "url_callback_retry" to "0"
                         )
                     )

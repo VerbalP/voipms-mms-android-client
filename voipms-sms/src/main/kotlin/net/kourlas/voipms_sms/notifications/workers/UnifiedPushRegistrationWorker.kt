@@ -56,7 +56,7 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 /**
- * F-Droid flavor worker. Three actions:
+ * Worker for the UnifiedPush notification method. Three actions:
  *  - SETUP: fetch the relay's VAPID public key and register one UnifiedPush
  *    instance per DID.
  *  - REGISTER: a DID's push endpoint became available -> store it on the relay

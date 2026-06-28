@@ -93,12 +93,13 @@ configure<ApplicationExtension> {
     namespace = "net.kourlas.voipms_sms"
 }
 
-// The UnifiedPush connector (F-Droid flavor) depends on
-// com.google.crypto.tink:tink, which collides with the tink-android brought in
-// by androidx.security.crypto (duplicate classes). Unify the F-Droid variant on
-// the connector's tink (Android-compatible since 1.9). Scoped to F-Droid
-// configurations so the primary/FCM flavor is left untouched.
-configurations.matching { it.name.startsWith("fdroid") }.configureEach {
+// The UnifiedPush connector depends on com.google.crypto.tink:tink, which
+// collides with the tink-android brought in by androidx.security.crypto
+// (duplicate classes). Unify everything on tink-android (Android-compatible
+// since 1.9). The connector is now an `implementation` dependency in every
+// flavor (the combined `primary` build offers a runtime FCM/UnifiedPush toggle),
+// so this substitution must apply to ALL configurations, not just F-Droid.
+configurations.configureEach {
     resolutionStrategy {
         // The UnifiedPush connector pulls the JVM "tink" artifact, which both
         // (a) duplicates classes from "tink-android" (via androidx.security.crypto)
@@ -149,9 +150,10 @@ dependencies {
 
     // fdroid-remove-end
 
-    // UnifiedPush connector (F-Droid flavor push via ntfy). Not a Google
-    // dependency, so it stays in the F-Droid build.
-    "fdroidImplementation"("org.unifiedpush.android:connector:3.3.3")
+    // UnifiedPush connector (push via ntfy). Not a Google dependency, so it is
+    // safe in every flavor: the F-Droid build uses it exclusively, and the
+    // combined `primary` build offers it as a runtime alternative to FCM.
+    implementation("org.unifiedpush.android:connector:3.3.3")
 
     // Other third-party libraries
     implementation(libs.moshi.adapters)

@@ -28,8 +28,10 @@ import net.kourlas.voipms_sms.BuildConfig
 import net.kourlas.voipms_sms.R
 import net.kourlas.voipms_sms.notifications.Notifications
 import net.kourlas.voipms_sms.notifications.workers.NotificationsRegistrationWorker
+import net.kourlas.voipms_sms.preferences.NOTIFICATION_METHOD_UNIFIEDPUSH
 import net.kourlas.voipms_sms.preferences.didsConfigured
 import net.kourlas.voipms_sms.preferences.getDids
+import net.kourlas.voipms_sms.preferences.getNotificationMethod
 import net.kourlas.voipms_sms.preferences.setSetupCompletedForVersion
 
 /**
@@ -45,8 +47,16 @@ suspend fun getInstallationId(): String {
 
 /**
  * Subscribes to FCM topics corresponding to the currently configured DIDs.
+ *
+ * Combined build: a no-op unless the notification method is FCM and Google Play
+ * Services is available.
  */
 fun subscribeToDidTopics(context: Context) {
+    // Skip when the user has chosen UnifiedPush (no FCM topics in that mode).
+    if (getNotificationMethod(context) == NOTIFICATION_METHOD_UNIFIEDPUSH) {
+        return
+    }
+
     // Do not subscribe to DID topics if Google Play Services is unavailable
     if (GoogleApiAvailability.getInstance()
             .isGooglePlayServicesAvailable(
@@ -63,14 +73,27 @@ fun subscribeToDidTopics(context: Context) {
 }
 
 /**
- * Attempt to enable push notifications, with the option of showing an error
- * using a snackbar on the specified activity if Google Play Services is
- * unavailable.
+ * Attempt to enable push notifications, dispatching on the notification-method
+ * preference. In FCM mode, may show an error using a snackbar on the specified
+ * activity if Google Play Services is unavailable.
+ *
+ * Switching method is authoritative on the VoIP.ms side: each method rewrites
+ * the SMS URL callback for every notification DID (FCM -> /fcm, UnifiedPush ->
+ * /callback), so any registration left over from the other method is inert and
+ * needs no explicit teardown.
  */
 fun enablePushNotifications(
     context: Context,
     activityToShowError: FragmentActivity? = null
 ) {
+    // UnifiedPush mode: delegate to the shared implementation.
+    if (getNotificationMethod(context) == NOTIFICATION_METHOD_UNIFIEDPUSH) {
+        enableUnifiedPushNotifications(context, activityToShowError)
+        return
+    }
+
+    // FCM mode.
+
     // Check if Google Play Services is available
     if (GoogleApiAvailability.getInstance()
             .isGooglePlayServicesAvailable(

@@ -23,8 +23,10 @@ import android.os.Bundle
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
 import androidx.preference.Preference
+import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceFragmentCompat
 import net.kourlas.voipms_sms.R
+import net.kourlas.voipms_sms.preferences.NOTIFICATION_METHOD_UNIFIEDPUSH
 import net.kourlas.voipms_sms.preferences.getStartDate
 import net.kourlas.voipms_sms.preferences.getUnifiedPushRegistrationSecret
 import net.kourlas.voipms_sms.preferences.setStartDate
@@ -116,6 +118,9 @@ class SynchronizationPreferencesFragment : PreferenceFragmentCompat(),
 
         // Update preference summaries
         updateSummaries()
+
+        // Show the UnifiedPush settings only when relevant (combined build).
+        updateNotificationMethodVisibility()
     }
 
     override fun onResume() {
@@ -123,6 +128,7 @@ class SynchronizationPreferencesFragment : PreferenceFragmentCompat(),
 
         // Update preference summaries
         updateSummaries()
+        updateNotificationMethodVisibility()
     }
 
     /**
@@ -145,15 +151,44 @@ class SynchronizationPreferencesFragment : PreferenceFragmentCompat(),
             updateSummary(findPreference(key))
 
             // Re-register push when the UnifiedPush relay URL or the
-            // default/custom toggle changes (F-Droid).
+            // default/custom toggle changes, or when the notification method is
+            // switched (combined primary build). Switching is authoritative on
+            // the VoIP.ms side, so re-enabling the selected method rewrites the
+            // SMS URL callback accordingly.
             if (key == getString(R.string.preferences_unifiedpush_relay_url_key)
                 || key == getString(
                     R.string.preferences_unifiedpush_relay_use_custom_key
                 )
+                || key == getString(
+                    R.string.preferences_notification_method_key
+                )
             ) {
                 context?.let { enablePushNotifications(it.applicationContext) }
             }
+
+            // Show/hide the UnifiedPush settings when the method changes.
+            if (key == getString(R.string.preferences_notification_method_key)) {
+                updateNotificationMethodVisibility()
+            }
         }
+    }
+
+    /**
+     * Combined build only: show the UnifiedPush relay settings when, and only
+     * when, the UnifiedPush notification method is selected. No-op in flavors
+     * that have no method preference (e.g. F-Droid), where the UnifiedPush
+     * category is always shown.
+     */
+    private fun updateNotificationMethodVisibility() {
+        val methodPref = findPreference<ListPreference>(
+            getString(R.string.preferences_notification_method_key)
+        ) ?: return
+        val unifiedPushCategory = findPreference<PreferenceCategory>(
+            getString(R.string.preferences_unifiedpush_category_key)
+        ) ?: return
+        val method = methodPref.value
+            ?: getString(R.string.preferences_notification_method_default_value)
+        unifiedPushCategory.isVisible = method == NOTIFICATION_METHOD_UNIFIEDPUSH
     }
 
     /**
@@ -162,8 +197,14 @@ class SynchronizationPreferencesFragment : PreferenceFragmentCompat(),
     private fun updateSummary(preference: Preference?) {
         context?.let {
             if (preference is ListPreference) {
-                // Display value of selected element as summary text
-                preference.summary = preference.entry
+                // Display value of selected element as summary text. Skip
+                // preferences that manage their own summary via a
+                // SummaryProvider (e.g. notification_method, which uses
+                // useSimpleSummaryProvider) — calling setSummary on those
+                // throws IllegalStateException.
+                if (preference.summaryProvider == null) {
+                    preference.summary = preference.entry
+                }
             } else if (
                 preference?.key == getString(
                     R.string.preferences_sync_start_date_key

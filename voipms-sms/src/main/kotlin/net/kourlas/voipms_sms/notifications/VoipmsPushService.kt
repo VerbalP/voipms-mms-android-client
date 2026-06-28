@@ -26,8 +26,10 @@ import org.unifiedpush.android.connector.data.PushEndpoint
 import org.unifiedpush.android.connector.data.PushMessage
 
 /**
- * Receives UnifiedPush events from the distributor (e.g. ntfy) for the F-Droid
- * flavor. The DID is used as the UnifiedPush "instance" identifier.
+ * Receives UnifiedPush events from the distributor (e.g. ntfy). The DID is used
+ * as the UnifiedPush "instance" identifier. Available in every flavor: the
+ * F-Droid build uses it exclusively, and the combined primary build uses it when
+ * the user selects UnifiedPush as the notification method.
  */
 class VoipmsPushService : PushService() {
 

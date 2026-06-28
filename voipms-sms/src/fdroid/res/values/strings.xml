@@ -29,14 +29,6 @@
     <!-- ConversationsActivity -->
     <string name="conversations_fail_web_browser">No web browser installed</string>
 
-    <!-- UnifiedPush -->
-    <string name="push_notifications_fail_no_distributor">No UnifiedPush distributor found. Install ntfy (from F-Droid or Google Play) to receive push notifications.</string>
-    <string name="push_notifications_fail_no_relay">Set the UnifiedPush relay URL in Settings → Synchronization first.</string>
-    <string name="preferences_unifiedpush_category_title">Push (UnifiedPush)</string>
-    <string name="preferences_unifiedpush_relay_use_custom_title">Use a custom relay server</string>
-    <string name="preferences_unifiedpush_relay_use_custom_summary">Off: use the built-in default relay. On: enter your own relay URL below.</string>
-    <string name="preferences_unifiedpush_relay_url_title">Relay server URL</string>
-    <string name="preferences_unifiedpush_relay_url_summary_default">e.g. https://your-relay.example.com</string>
-    <string name="preferences_unifiedpush_relay_secret_title">Registration secret</string>
-    <string name="preferences_unifiedpush_relay_secret_summary">Shared secret used to register with the relay (stored encrypted)</string>
+    <!-- UnifiedPush display strings moved to src/main/res/values/strings.xml so
+         the combined primary build can reuse them. -->
 </resources>

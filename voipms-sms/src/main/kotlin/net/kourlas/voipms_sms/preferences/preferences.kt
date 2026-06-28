@@ -244,6 +244,27 @@ fun setUnifiedPushVapidKey(context: Context, key: String) = setStringPreference(
     key
 )
 
+// --- Notification method (combined primary build) ---
+// Chooses between Google Play Services (FCM) and UnifiedPush at runtime. The
+// F-Droid flavor is UnifiedPush-only and ignores this preference (its
+// subscribeToDidTopics is a no-op and its enablePushNotifications always uses
+// UnifiedPush).
+
+const val NOTIFICATION_METHOD_FCM = "fcm"
+const val NOTIFICATION_METHOD_UNIFIEDPUSH = "unifiedpush"
+
+fun getNotificationMethod(context: Context): String = getStringPreference(
+    context,
+    context.getString(R.string.preferences_notification_method_key),
+    context.getString(R.string.preferences_notification_method_default_value)
+)
+
+fun setNotificationMethod(context: Context, method: String) = setStringPreference(
+    context,
+    context.getString(R.string.preferences_notification_method_key),
+    method
+)
+
 fun getReadTimeout(context: Context): Int =
     getStringPreference(
         context,

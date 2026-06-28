@@ -312,6 +312,34 @@
     <string name="preferences_unifiedpush_relay_use_custom_key" translatable="false">unifiedpush_relay_use_custom</string>
     <!-- Default relay used when "use custom" is off. Referenced by preferences.kt (all flavors). -->
     <string name="preferences_unifiedpush_relay_url_default_value" translatable="false">https://voipms-mms-push-relay.verbalp.workers.dev</string>
+
+    <!-- UnifiedPush — display strings (shared: used by the F-Droid sync screen
+         and by the combined primary sync screen). -->
+    <string name="push_notifications_fail_no_distributor">No UnifiedPush distributor found. Install ntfy (from F-Droid or Google Play) to receive push notifications.</string>
+    <string name="push_notifications_fail_no_relay">Set the UnifiedPush relay URL in Settings → Synchronization first.</string>
+    <string name="preferences_unifiedpush_category_title">Push (UnifiedPush)</string>
+    <string name="preferences_unifiedpush_relay_use_custom_title">Use a custom relay server</string>
+    <string name="preferences_unifiedpush_relay_use_custom_summary">Off: use the built-in default relay. On: enter your own relay URL below.</string>
+    <string name="preferences_unifiedpush_relay_url_title">Relay server URL</string>
+    <string name="preferences_unifiedpush_relay_url_summary_default">e.g. https://your-relay.example.com</string>
+    <string name="preferences_unifiedpush_relay_secret_title">Registration secret</string>
+    <string name="preferences_unifiedpush_relay_secret_summary">Shared secret used to register with the relay (stored encrypted)</string>
+
+    <!-- Notification method toggle (combined primary build only) -->
+    <string name="preferences_unifiedpush_category_key" translatable="false">unifiedpush_category</string>
+    <string name="preferences_notification_method_key" translatable="false">notification_method</string>
+    <string name="preferences_notification_method_default_value" translatable="false">fcm</string>
+    <string name="preferences_push_category_title">Push notifications</string>
+    <string name="preferences_notification_method_title">Notification method</string>
+    <string-array name="preferences_notification_method_entries">
+        <item>Google Play Services (FCM)</item>
+        <item>UnifiedPush (ntfy)</item>
+    </string-array>
+    <string-array name="preferences_notification_method_values" translatable="false">
+        <item>fcm</item>
+        <item>unifiedpush</item>
+    </string-array>
+
     <string name="sync_force_recent" translatable="false">net.kourlas.voipms_sms.SYNC_FORCE_RECENT</string>
     <string name="sync_single_did" translatable="false">net.kourlas.voipms_sms.SYNC_SINGLE_DID</string>
     <string name="sync_error_account">Sync failed: no account configured</string>
