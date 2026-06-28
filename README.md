@@ -56,16 +56,20 @@ and [F-Droid](https://f-droid.org/packages/net.kourlas.voipms_sms).
 * Fixed background sync silently dropping messages on Android 15+ (caused by a
   foreground-service start exception that wasn't being caught).
 
-### Push notifications without Google (F-Droid flavor)
-* Privacy-respecting push via **UnifiedPush + ntfy**, with no Google Play
-  Services or Firebase, using a small self-hostable relay.
-* **Requires the [ntfy](https://ntfy.sh) app** (a UnifiedPush distributor)
-  installed and opened on the device — it is what actually delivers the push
-  without Google. Without a UnifiedPush distributor, the app falls back to
-  periodic background sync (no instant notifications).
-* A **Default / Custom relay** toggle, and **per-DID targeted sync** so a push
+### Flexible push notifications (FCM *or* UnifiedPush)
+* The **`primary`** build supports **both** push methods and lets you switch at
+  runtime, in **Settings → Synchronization → Notification method**:
+  * **Google Play Services (FCM)** — the Google/Firebase push path.
+  * **UnifiedPush** — privacy-respecting push via **UnifiedPush + ntfy**, with no
+    Google Play Services or Firebase.
+* The **`fdroid`** build is 100% FOSS and uses **UnifiedPush only**.
+* Both methods use the same small **self-hostable relay** (a Cloudflare Worker),
+  with a **Default / Custom relay** toggle and **per-DID targeted sync** so a push
   only fetches the number it was sent for — making notifications fast.
-* The upstream Google/FCM push path is retained in the `primary` flavor.
+* **UnifiedPush requires the [ntfy](https://ntfy.sh) app** (a UnifiedPush
+  distributor) installed and opened on the device — it is what actually delivers
+  the push without Google. Without a distributor, the app falls back to periodic
+  background sync (no instant notifications).
 
 ## Migration ##
 
@@ -94,15 +98,18 @@ they install side by side and you won't lose anything during the move.
 
 The project uses two product flavors:
 
-* **`primary`** — uses Google's (closed-source) Firebase libraries for FCM push
-  notifications.
-* **`fdroid`** — completely open source; uses UnifiedPush (ntfy) for push instead
-  of Firebase.
+* **`primary`** — a combined build supporting **both** push methods, selectable at
+  runtime: Google's (closed-source) Firebase libraries for **FCM**, **and**
+  **UnifiedPush** (ntfy). This is the build distributed for sideloading. It
+  requires a `google-services.json` (FCM) at `voipms-sms/`.
+* **`fdroid`** — completely open source; **UnifiedPush (ntfy) only**, with no
+  Firebase.
 
 Build a debug APK with Gradle, for example:
 
 ```sh
-./gradlew assembleFdroidFullDebug
+./gradlew assemblePrimaryFullDebug   # FCM + UnifiedPush (needs google-services.json)
+./gradlew assembleFdroidFullDebug    # UnifiedPush only, fully FOSS
 ```
 
 ## Documentation ##
