@@ -18,8 +18,8 @@ configure<ApplicationExtension> {
         applicationId = "com.verbalp.voipms_mms"
         minSdk = 23
         targetSdk = 36
-        versionCode = 156
-        versionName = "0.7.00"
+        versionCode = 157
+        versionName = "0.7.01"
     }
     flavorDimensions += "version"
     flavorDimensions += "demo"
