@@ -47,7 +47,8 @@ data class FileUpload(
 suspend inline fun <reified T> httpPostWithMultipartFormData(
     context: Context, url: String,
     formData: Map<String, String> = emptyMap(),
-    fileUploads: List<FileUpload> = emptyList()
+    fileUploads: List<FileUpload> = emptyList(),
+    readTimeoutMs: Long? = null
 ): T? {
     val requestBodyBuilder = MultipartBody.Builder()
     requestBodyBuilder.setType(MultipartBody.FORM)
@@ -69,7 +70,10 @@ suspend inline fun <reified T> httpPostWithMultipartFormData(
         .build()
 
     val requestClient = HttpClientManager.getInstance().client.newBuilder()
-        .readTimeout(getReadTimeout(context) * 1000L, TimeUnit.MILLISECONDS)
+        .readTimeout(
+            readTimeoutMs ?: (getReadTimeout(context) * 1000L),
+            TimeUnit.MILLISECONDS
+        )
         .connectTimeout(
             getConnectTimeout(context) * 1000L,
             TimeUnit.MILLISECONDS

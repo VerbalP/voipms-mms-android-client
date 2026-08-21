@@ -342,21 +342,30 @@ class SendMessageWorker(context: Context, params: WorkerParameters) :
                 }
             }
 
-            repeat(3) {
-                try {
-                    return httpPostWithMultipartFormData(
-                        applicationContext,
-                        "https://voip.ms/api/v1/rest.php",
-                        formData
-                    )
-                } catch (e: IOException) {
-                    // Try again...
-                }
+            // Send exactly once: a send is NOT idempotent. For MMS especially,
+            // the large upload can hit a read timeout *after* VoIP.ms has
+            // already accepted and delivered the message, so retrying the POST
+            // sends duplicates. On failure, mark not-sent and let the user retry
+            // manually (a single, explicit attempt).
+            //
+            // MMS uploads are large and slow to process server-side, so allow a
+            // much longer read timeout; the default (~15 s) times out on the
+            // response even after VoIP.ms has accepted the message, which is
+            // what made those sends look "not sent" (and, with the old retry
+            // loop, produced duplicates).
+            return try {
+                httpPostWithMultipartFormData(
+                    applicationContext,
+                    "https://voip.ms/api/v1/rest.php",
+                    formData,
+                    readTimeoutMs = if (useMms) 120_000L else null
+                )
+            } catch (e: IOException) {
+                error = applicationContext.getString(
+                    R.string.send_message_error_api_request
+                )
+                null
             }
-            error = applicationContext.getString(
-                R.string.send_message_error_api_request
-            )
-            return null
         } catch (e: JsonDataException) {
             logException(e)
             error = applicationContext.getString(
