@@ -26,6 +26,7 @@ import android.util.Base64
 import android.webkit.MimeTypeMap
 import okhttp3.Request
 import java.io.File
+import java.util.UUID
 
 const val MAX_MMS_BYTES = 1_200_000
 
@@ -80,11 +81,15 @@ fun compressImageToCache(
     var quality = 85
     var scaledBitmap = bitmap
 
-    while (quality >= 10) {
-        val cacheDir = File(context.cacheDir, "outgoing")
-        cacheDir.mkdirs()
-        val file = File(cacheDir, "pending_mms_$index.jpeg")
+    val cacheDir = File(context.cacheDir, "outgoing")
+    cacheDir.mkdirs()
+    // Unique per call: different outgoing messages (and multiple attachments)
+    // must never share a file. A fixed name (pending_mms_<index>) let one
+    // message's image overwrite another's, and made the image loader show a
+    // stale cached decode for the reused path.
+    val file = File(cacheDir, "pending_mms_${index}_${UUID.randomUUID()}.jpeg")
 
+    while (quality >= 10) {
         file.outputStream().use { out ->
             scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
         }
